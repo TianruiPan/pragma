@@ -28,12 +28,13 @@ async function normalizeAssetMetadata({ contextDir, outputRel, asset, id }) {
   const sniffed = await sniffAssetFile(absolute);
   const explicitType = detectAssetType(outputRel, asset.type || asset.format);
   const type = sniffed.type !== "binary" ? sniffed.type : explicitType;
+  const declaredChecksum = /^sha256:[0-9a-f]{64}$/i.test(String(asset.checksum || "")) ? asset.checksum : undefined;
   return {
     type,
     mime: sniffed.mime || asset.mime || mimeForType(type),
-    width: asset.width ?? sniffed.width,
-    height: asset.height ?? sniffed.height,
-    checksum: asset.checksum || await sha256File(absolute),
+    width: sniffed.width ?? asset.width,
+    height: sniffed.height ?? asset.height,
+    checksum: declaredChecksum || await sha256File(absolute),
     detected: {
       type: sniffed.type,
       mime: sniffed.mime,

@@ -12,6 +12,20 @@ function assert(condition, message, errors) {
   if (!condition) errors.push(message);
 }
 
+function validationIssue(errors, issues, code, message, details = {}) {
+  const issue = { level: "error", code, message, ...details };
+  issues.push(issue);
+  errors.push(`[${code}] ${message}`);
+  return issue;
+}
+
+function validationWarning(warnings, issues, code, message, details = {}) {
+  const issue = { level: "warning", code, message, ...details };
+  issues.push(issue);
+  warnings.push(`[${code}] ${message}`);
+  return issue;
+}
+
 function hasSecretKey(value, trail = []) {
   if (!value || typeof value !== "object") return undefined;
   for (const [key, child] of Object.entries(value)) {
@@ -180,24 +194,228 @@ function assertFigmaSourceConsistency({ manifest, metadata, selection }, errors)
   }
 }
 
+function isTrustedSha256(value) {
+  return /^sha256:[0-9a-f]{64}$/i.test(String(value || ""));
+}
+
+async function readJsonWithIssue(filePath, errors, warnings, issues, code, message, details = {}) {
+  if (!(await pathExists(filePath))) {
+    validationIssue(errors, issues, code, message, details);
+    return undefined;
+  }
+  try {
+    return await readJson(filePath);
+  } catch (error) {
+    validationIssue(errors, issues, code, `${message}: ${error.message}`, details);
+    return undefined;
+  }
+}
+
+function registrySnapshotEntry(registry, role, snapshotId) {
+  return asArray(registry?.roles?.[role]).find((entry) => entry.snapshotId === snapshotId);
+}
+
+function snapshotRootFromPath(repoRoot, relPath) {
+  if (!relPath) return undefined;
+  const normalized = String(relPath).replace(/\\/g, "/");
+  if (/\/latest(?:\/|$)|(^|\/)latest$/i.test(normalized)) return "floating-latest";
+  if (path.isAbsolute(normalized)) return undefined;
+  const resolved = path.resolve(repoRoot, normalized);
+  if (!isPathInside(repoRoot, resolved)) return undefined;
+  return resolved;
+}
+
+async function validateSnapshotChecksums({ repoRoot, snapshotDir, snapshotId, errors, warnings, issues }) {
+  const checksumsPath = path.join(snapshotDir, "checksums.json");
+  const checksums = await readJsonWithIssue(
+    checksumsPath,
+    errors,
+    warnings,
+    issues,
+    "SNAPSHOT_PATH_MISSING",
+    `Snapshot ${snapshotId} is missing checksums.json`,
+    { snapshotId, path: checksumsPath }
+  );
+  if (!checksums) return;
+  for (const entry of asArray(checksums.files)) {
+    const file = path.resolve(snapshotDir, String(entry.path || ""));
+    if (!isPathInside(snapshotDir, file)) {
+      validationIssue(errors, issues, "SNAPSHOT_PATH_MISSING", `Snapshot ${snapshotId} checksum entry is outside snapshot root: ${entry.path}`, { snapshotId, path: entry.path });
+      continue;
+    }
+    if (!(await pathExists(file))) {
+      validationIssue(errors, issues, "SNAPSHOT_PATH_MISSING", `Snapshot ${snapshotId} checksum entry is missing: ${entry.path}`, { snapshotId, path: entry.path });
+      continue;
+    }
+    const actual = await sha256File(file);
+    if (actual !== entry.checksum) {
+      validationIssue(errors, issues, "SNAPSHOT_CHECKSUM_MISMATCH", `Snapshot ${snapshotId} checksum mismatch: ${entry.path}`, { snapshotId, path: entry.path, expected: entry.checksum, actual });
+    }
+  }
+}
+
+async function validateSnapshotReference({ repoRoot, fileKey, role, entry, errors, warnings, issues }) {
+  if (!entry?.snapshotId) {
+    validationIssue(errors, issues, "SOURCE_ENTRY_MISSING", `Registry ${fileKey} ${role} entry is missing snapshotId`, { fileKey, role });
+    return;
+  }
+  if (/latest/i.test(entry.snapshotId)) {
+    validationIssue(errors, issues, "FLOATING_LATEST_REFERENCE", `Registry ${fileKey} ${role} references floating latest: ${entry.snapshotId}`, { fileKey, role, snapshotId: entry.snapshotId });
+  }
+  if (!isConcreteSnapshotId(entry.snapshotId, role)) {
+    validationIssue(errors, issues, "SOURCE_ENTRY_MISSING", `Registry ${fileKey} ${role} snapshotId is not concrete: ${entry.snapshotId}`, { fileKey, role, snapshotId: entry.snapshotId });
+  }
+  if (!isTrustedSha256(entry.checksum)) {
+    validationIssue(errors, issues, "SNAPSHOT_CHECKSUM_MISMATCH", `Registry ${fileKey} ${role} snapshot has invalid checksum: ${entry.snapshotId}`, { fileKey, role, snapshotId: entry.snapshotId });
+  }
+  const snapshotPath = entry.path || `.pragma/design-sources/figma/${fileKey}/snapshots/${entry.snapshotId}`;
+  const snapshotDir = snapshotRootFromPath(repoRoot, snapshotPath);
+  if (snapshotDir === "floating-latest") {
+    validationIssue(errors, issues, "FLOATING_LATEST_REFERENCE", `Registry ${fileKey} ${role} snapshot path references floating latest: ${snapshotPath}`, { fileKey, role, snapshotId: entry.snapshotId, path: snapshotPath });
+    return;
+  }
+  if (!snapshotDir || !(await pathExists(snapshotDir))) {
+    validationIssue(errors, issues, "SNAPSHOT_PATH_MISSING", `Registry ${fileKey} ${role} snapshot path is missing: ${snapshotPath}`, { fileKey, role, snapshotId: entry.snapshotId, path: snapshotPath });
+    return;
+  }
+  const normalizedFile = role === "components" ? "components.json" : "assets.json";
+  const normalizedPath = path.join(snapshotDir, "normalized", normalizedFile);
+  if (!(await pathExists(normalizedPath))) {
+    validationIssue(errors, issues, "SNAPSHOT_PATH_MISSING", `Registry ${fileKey} ${role} snapshot normalized/${normalizedFile} is missing`, { fileKey, role, snapshotId: entry.snapshotId });
+  }
+  await validateSnapshotChecksums({ repoRoot, snapshotDir, snapshotId: entry.snapshotId, errors, warnings, issues });
+}
+
+async function listFigmaRegistryFileKeys(repoRoot, explicitFileKey) {
+  if (explicitFileKey) return [explicitFileKey];
+  const root = path.join(repoRoot, ".pragma", "design-sources", "figma");
+  if (!(await pathExists(root))) return [];
+  const entries = await fs.readdir(root, { withFileTypes: true });
+  return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+}
+
+export async function validateSourceRegistry(options) {
+  const repoRoot = path.resolve(String(options.repo || ""));
+  const errors = [];
+  const warnings = [];
+  const issues = [];
+  if (!options.repo) {
+    validationIssue(errors, issues, "SOURCE_REGISTRY_MISSING", "--repo is required for --source-registry validation");
+    return { ok: false, errors, warnings, issues, repoRoot };
+  }
+  const figmaRoot = path.join(repoRoot, ".pragma", "design-sources", "figma");
+  if (!(await pathExists(figmaRoot))) {
+    validationIssue(errors, issues, "SOURCE_REGISTRY_MISSING", `Source registry root is missing: ${figmaRoot}`, { path: figmaRoot });
+    return { ok: false, errors, warnings, issues, repoRoot, sourceRegistry: true };
+  }
+  const fileKeys = await listFigmaRegistryFileKeys(repoRoot, options["file-key"] || options.fileKey);
+  if (!fileKeys.length) {
+    validationIssue(errors, issues, "SOURCE_REGISTRY_MISSING", "No Figma source registry fileKey directories were found", { path: figmaRoot });
+  }
+  const checked = [];
+  for (const fileKey of fileKeys) {
+    const root = path.join(figmaRoot, fileKey);
+    const registryPath = path.join(root, "registry.json");
+    const sourcesPath = path.join(root, "sources.json");
+    const registry = await readJsonWithIssue(registryPath, errors, warnings, issues, "SOURCE_REGISTRY_MISSING", `registry.json is missing or invalid for ${fileKey}`, { fileKey, path: registryPath });
+    const sources = await readJsonWithIssue(sourcesPath, errors, warnings, issues, "SOURCE_ENTRY_MISSING", `sources.json is missing or invalid for ${fileKey}`, { fileKey, path: sourcesPath });
+    if (!registry) continue;
+    checked.push(fileKey);
+    if (registry.fileKey && registry.fileKey !== fileKey) {
+      validationIssue(errors, issues, "SOURCE_REGISTRY_MISSING", `registry.json fileKey ${registry.fileKey} does not match directory ${fileKey}`, { fileKey, registryFileKey: registry.fileKey });
+    }
+    for (const role of ["components", "assets"]) {
+      const latest = typeof registry.latest?.[role] === "string" ? registry.latest[role] : registry.latest?.[role]?.snapshotId;
+      if (latest) {
+        if (/latest/i.test(latest)) {
+          validationIssue(errors, issues, "FLOATING_LATEST_REFERENCE", `Registry latest.${role} must point to a concrete snapshot, not ${latest}`, { fileKey, role, snapshotId: latest });
+        }
+        const entry = registrySnapshotEntry(registry, role, latest);
+        if (!entry) {
+          validationIssue(errors, issues, "LATEST_POINTER_BROKEN", `Registry latest.${role} points to missing snapshot ${latest}`, { fileKey, role, snapshotId: latest });
+        }
+      }
+      for (const entry of asArray(registry.roles?.[role])) {
+        await validateSnapshotReference({ repoRoot, fileKey, role, entry, errors, warnings, issues });
+      }
+    }
+    for (const source of asArray(sources?.sources)) {
+      const role = source.role;
+      const snapshotId = source.snapshotId;
+      if (!["components", "assets"].includes(role) || !snapshotId) {
+        validationWarning(warnings, issues, "SOURCE_ENTRY_MISSING", `sources.json entry is missing role or snapshotId for ${fileKey}`, { fileKey, source });
+        continue;
+      }
+      if (!registrySnapshotEntry(registry, role, snapshotId)) {
+        validationIssue(errors, issues, "SOURCE_ENTRY_MISSING", `sources.json references missing ${role} snapshot ${snapshotId}`, { fileKey, role, snapshotId });
+      }
+    }
+  }
+  return { ok: errors.length === 0, errors, warnings, issues, repoRoot, sourceRegistry: true, fileKeys: checked };
+}
+
+async function validateDependencySnapshotRecoverability({ repoRoot, fileKey, role, dependency, errors, warnings, issues }) {
+  if (!dependencyRoleNeedsLock(dependency)) return;
+  if (!repoRoot) {
+    validationIssue(errors, issues, "DEPENDENCY_SNAPSHOT_UNRESOLVABLE", `Cannot resolve repo root for dependency ${role}`, { role, snapshotId: dependency.snapshotId });
+    return;
+  }
+  const registryPath = path.join(repoRoot, ".pragma", "design-sources", "figma", fileKey || "", "registry.json");
+  const registry = await readJsonWithIssue(
+    registryPath,
+    errors,
+    warnings,
+    issues,
+    "SOURCE_REGISTRY_MISSING",
+    `Source registry is missing for dependency ${role}`,
+    { role, fileKey, path: registryPath }
+  );
+  if (!registry) return;
+  const entry = registrySnapshotEntry(registry, role, dependency.snapshotId);
+  if (!entry) {
+    validationIssue(errors, issues, "DEPENDENCY_SNAPSHOT_UNRESOLVABLE", `Dependency ${role} snapshot is not present in registry: ${dependency.snapshotId}`, { role, fileKey, snapshotId: dependency.snapshotId });
+    return;
+  }
+  if (entry.path && dependency.path && String(entry.path).replace(/\\/g, "/") !== String(dependency.path).replace(/\\/g, "/")) {
+    validationIssue(errors, issues, "DEPENDENCY_SNAPSHOT_UNRESOLVABLE", `Dependency ${role} path does not match registry entry: ${dependency.snapshotId}`, { role, fileKey, snapshotId: dependency.snapshotId, dependencyPath: dependency.path, registryPath: entry.path });
+  }
+  if (entry.checksum && dependency.checksum && entry.checksum !== dependency.checksum) {
+    validationIssue(errors, issues, "SNAPSHOT_CHECKSUM_MISMATCH", `Dependency ${role} checksum does not match registry entry: ${dependency.snapshotId}`, { role, fileKey, snapshotId: dependency.snapshotId, dependencyChecksum: dependency.checksum, registryChecksum: entry.checksum });
+  }
+  const snapshotDir = snapshotRootFromPath(repoRoot, dependency.path || entry.path);
+  if (snapshotDir === "floating-latest") {
+    validationIssue(errors, issues, "FLOATING_LATEST_REFERENCE", `Dependency ${role} path references floating latest`, { role, fileKey, snapshotId: dependency.snapshotId, path: dependency.path || entry.path });
+    return;
+  }
+  if (!snapshotDir || !(await pathExists(snapshotDir))) {
+    validationIssue(errors, issues, "SNAPSHOT_PATH_MISSING", `Dependency ${role} snapshot path is missing: ${dependency.path || entry.path}`, { role, fileKey, snapshotId: dependency.snapshotId, path: dependency.path || entry.path });
+    return;
+  }
+  await validateSnapshotChecksums({ repoRoot, snapshotDir, snapshotId: dependency.snapshotId, errors, warnings, issues });
+}
+
 export async function validateDesignContext(options) {
+  if (options["source-registry"] || options.sourceRegistry) {
+    return validateSourceRegistry(options);
+  }
   const contextDir = path.resolve(String(options.context));
   const errors = [];
   const warnings = [];
+  const issues = [];
 
   assert(await pathExists(contextDir), `Context directory does not exist: ${contextDir}`, errors);
-  if (errors.length) return { ok: false, errors, warnings, contextDir };
+  if (errors.length) return { ok: false, errors, warnings, issues, contextDir };
 
   const manifestPath = path.join(contextDir, "manifest.json");
   assert(await pathExists(manifestPath), "manifest.json is missing", errors);
-  if (errors.length) return { ok: false, errors, warnings, contextDir };
+  if (errors.length) return { ok: false, errors, warnings, issues, contextDir };
 
   let manifest;
   try {
     manifest = await readJson(manifestPath);
   } catch (error) {
     errors.push(`manifest.json is not valid JSON: ${error.message}`);
-    return { ok: false, errors, warnings, contextDir };
+    return { ok: false, errors, warnings, issues, contextDir };
   }
 
   assert(manifest.schemaVersion === "2.0", "manifest.schemaVersion must be 2.0", errors);
@@ -370,24 +588,35 @@ export async function validateDesignContext(options) {
       assert(dep && typeof dep === "object", `dependencies.${role} is required`, errors);
       if (!dep) continue;
       assert(isValidDependencyStatus(dep.status), `dependencies.${role}.status is invalid`, errors);
-      assert(!/latest/i.test(String(dep.snapshotId || "")), `dependencies.${role}.snapshotId must not reference floating latest`, errors);
-      assert(!/\/latest(?:\/|$)/i.test(String(dep.path || "").replace(/\\/g, "/")), `dependencies.${role}.path must not reference floating latest`, errors);
+      if (/latest/i.test(String(dep.snapshotId || ""))) {
+        validationIssue(errors, issues, "FLOATING_LATEST_REFERENCE", `dependencies.${role}.snapshotId must not reference floating latest`, { role, snapshotId: dep.snapshotId });
+      }
+      if (/\/latest(?:\/|$)/i.test(String(dep.path || "").replace(/\\/g, "/"))) {
+        validationIssue(errors, issues, "FLOATING_LATEST_REFERENCE", `dependencies.${role}.path must not reference floating latest`, { role, path: dep.path });
+      }
       if (dependencyRoleNeedsLock(dep)) {
         assert(isConcreteSnapshotId(dep.snapshotId, role), `dependencies.${role}.snapshotId must lock a concrete ${role}-* snapshot`, errors);
         assert(Boolean(dep.path), `dependencies.${role}.path is required for ${dep.status}`, errors);
-        assert(/^sha256:[0-9a-f]{64}$/i.test(String(dep.checksum || "")), `dependencies.${role}.checksum must be sha256`, errors);
+        if (!/^sha256:[0-9a-f]{64}$/i.test(String(dep.checksum || ""))) {
+          validationIssue(errors, issues, "SNAPSHOT_CHECKSUM_MISMATCH", `dependencies.${role}.checksum must be sha256`, { role, snapshotId: dep.snapshotId });
+        }
         if (dep.path && repoRoot) {
           const resolved = resolvePackageRelative(repoRoot, contextDir, dep.path);
-          assert(Boolean(resolved), `dependencies.${role}.path is outside repo`, errors);
-          if (resolved) assert(await pathExists(resolved), `dependencies.${role}.path is missing: ${dep.path}`, errors);
+          if (!resolved) {
+            validationIssue(errors, issues, "DEPENDENCY_SNAPSHOT_UNRESOLVABLE", `dependencies.${role}.path is outside repo`, { role, path: dep.path });
+          } else if (!(await pathExists(resolved))) {
+            validationIssue(errors, issues, "SNAPSHOT_PATH_MISSING", `dependencies.${role}.path is missing: ${dep.path}`, { role, path: dep.path, snapshotId: dep.snapshotId });
+          }
         }
       }
     }
 
     if (dependencyRoleNeedsLock(dependencies.components)) {
+      await validateDependencySnapshotRecoverability({ repoRoot, fileKey: dependencies.fileKey, role: "components", dependency: dependencies.components, errors, warnings, issues });
       lockedComponentsSnapshot = repoRoot ? await readSnapshotJson(repoRoot, dependencies.components, "components.json", errors) : undefined;
     }
     if (dependencyRoleNeedsLock(dependencies.assets)) {
+      await validateDependencySnapshotRecoverability({ repoRoot, fileKey: dependencies.fileKey, role: "assets", dependency: dependencies.assets, errors, warnings, issues });
       lockedAssetsSnapshot = repoRoot ? await readSnapshotJson(repoRoot, dependencies.assets, "assets.json", errors) : undefined;
     }
 
@@ -522,7 +751,7 @@ export async function validateDesignContext(options) {
     }
   }
 
-  return { ok: errors.length === 0, errors, warnings, contextDir, manifest };
+  return { ok: errors.length === 0, errors, warnings, issues, contextDir, manifest };
 }
 
 export async function assertValidDesignContext(options) {

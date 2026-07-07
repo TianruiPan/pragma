@@ -36,6 +36,11 @@ function normalizeRole(role, input = undefined) {
   const status = normalizeStatus(input?.status, "none");
   const entry = { status };
   if (input?.frameNodeId || input?.nodeId || input?.figmaNodeId) entry.frameNodeId = normalizeFigmaNodeId(input.frameNodeId || input.nodeId || input.figmaNodeId);
+  const frameNodeIds = asArray(input?.frameNodeIds)
+    .map((nodeId) => normalizeFigmaNodeId(nodeId))
+    .filter(Boolean);
+  if (frameNodeIds.length) entry.frameNodeIds = frameNodeIds;
+  else if (entry.frameNodeId) entry.frameNodeIds = [entry.frameNodeId];
   if (input?.snapshotId) entry.snapshotId = String(input.snapshotId);
   if (input?.path) entry.path = String(input.path).replace(/\\/g, "/");
   if (input?.checksum) entry.checksum = String(input.checksum);

@@ -29,6 +29,15 @@ async function readJson(file) {
   return JSON.parse(await fs.readFile(file, "utf8"));
 }
 
+async function writeFakePng(file, width, height) {
+  const png = Buffer.alloc(24);
+  png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  png.writeUInt32BE(width, 16);
+  png.writeUInt32BE(height, 20);
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, png);
+}
+
 async function createInputFixture(root) {
   const input = path.join(root, "input");
   const repo = path.join(root, "repo");
@@ -38,6 +47,21 @@ async function createInputFixture(root) {
     targetDevIssues: [{ number: 101, title: "Implement UI" }],
     figma: { fileKey: "file-key", nodeIds: ["1:23"], selectionMode: "explicit-node-ids" },
     capturedAt: "2026-07-06T10:00:00+08:00"
+  });
+  await writeJson(path.join(input, "dependency-lock.json"), {
+    schemaVersion: "2.0",
+    kind: "pragma-design-dependencies",
+    fileKey: "file-key",
+    capturedAt: "2026-07-06T10:00:00+08:00",
+    pageFrames: [{ nodeId: "1:23", name: "Main", snapshotId: "page-1-23-fixed" }],
+    components: { status: "none" },
+    assets: { status: "none" },
+    rules: {
+      lockDependencies: true,
+      neverDependOnFloatingLatest: true,
+      ifMissingComponentsAndPageHasInstances: "block",
+      ifMissingAssetsAndPageHasUnresolvedRefs: "block"
+    }
   });
   await writeJson(path.join(input, "figma", "metadata.json"), { fileName: "Demo" });
   await writeJson(path.join(input, "figma", "selection.json"), { nodes: [{ id: "1:23", name: "Main", width: 1440, height: 900 }] });
@@ -131,6 +155,123 @@ test("prepare-figma-capture reports selected, reused, missing, and none dependen
   );
 });
 
+test("preflight --fix repairs placeholder asset checksums and file dimensions", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-preflight-asset-"));
+  const { input, repo } = await createInputFixture(tmp);
+  await writeFakePng(path.join(input, "assets", "icons", "drone.png"), 2, 3);
+  await fs.rm(path.join(input, "assets", "icons", "drone.svg"), { force: true });
+  await writeJson(path.join(input, "assets-manifest.json"), {
+    schemaVersion: "2.0",
+    kind: "pragma-design-assets",
+    assets: [{
+      id: "asset-drone-icon",
+      name: "Drone",
+      type: "png",
+      mime: "image/png",
+      path: "icons/drone.png",
+      width: 32,
+      height: 32,
+      checksum: "sha256:plugin-webcrypto-unavailable-24",
+      required: true
+    }]
+  });
+
+  const preflight = JSON.parse((await run(["design", "preflight", "--input", input, "--repo", repo, "--fix", "--json"])).stdout);
+  assert.equal(preflight.ok, true);
+  assert.equal(typeof preflight.timings.resolveInputMs, "number");
+  assert.equal(typeof preflight.timings.preflightMs, "number");
+  assert.equal(preflight.repairs.some((repair) => repair.code === "ASSET_CHECKSUM_REPAIRED"), true);
+  const manifest = await readJson(path.join(input, "assets-manifest.json"));
+  assert.equal(manifest.assets[0].width, 2);
+  assert.equal(manifest.assets[0].height, 3);
+  assert.match(manifest.assets[0].checksum, /^sha256:[0-9a-f]{64}$/);
+  const bindings = await readJson(path.join(input, "asset-bindings.json"));
+  assert.equal(bindings.bindings[0].placement.width, 32);
+});
+
+test("preflight materializes selected dependency snapshots when frame data is present", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-preflight-snapshot-"));
+  const { input, repo } = await createInputFixture(tmp);
+  const capture = await readJson(path.join(input, "capture.json"));
+  capture.figma.frames = {
+    page: [{ nodeId: "1:23", name: "Main" }],
+    components: [{ nodeId: "5:100", name: "Components" }],
+    assets: []
+  };
+  await writeJson(path.join(input, "capture.json"), capture);
+  const selection = await readJson(path.join(input, "figma", "selection.json"));
+  selection.fileKey = "file-key";
+  selection.frames = {
+    page: [{ nodeId: "1:23", name: "Main" }],
+    components: [{ nodeId: "5:100", name: "Components" }],
+    assets: []
+  };
+  await writeJson(path.join(input, "figma", "selection.json"), selection);
+  await writeJson(path.join(input, "dependency-lock.json"), {
+    schemaVersion: "2.0",
+    kind: "pragma-design-dependencies",
+    fileKey: "file-key",
+    capturedAt: "2026-07-06T10:00:00+08:00",
+    pageFrames: [{ nodeId: "1:23", name: "Main", snapshotId: "page-1-23-fixed" }],
+    components: {
+      status: "selected",
+      frameNodeId: "5:100",
+      frameNodeIds: ["5:100"],
+      snapshotId: null,
+      path: null,
+      checksum: null,
+      materializationStatus: "pending-preflight",
+      needsSourceSync: true
+    },
+    assets: { status: "none" },
+    rules: {
+      lockDependencies: true,
+      neverDependOnFloatingLatest: true,
+      ifMissingComponentsAndPageHasInstances: "block",
+      ifMissingAssetsAndPageHasUnresolvedRefs: "block"
+    }
+  });
+
+  const preflight = JSON.parse((await run(["design", "preflight", "--input", input, "--repo", repo, "--fix", "--json"])).stdout);
+  assert.equal(preflight.ok, true);
+  assert.equal(preflight.repairs.some((repair) => repair.code === "DEPENDENCY_SNAPSHOT_MATERIALIZED"), true);
+  const lock = await readJson(path.join(input, "dependency-lock.json"));
+  assert.match(lock.components.snapshotId, /^components-5-100-/);
+  assert.deepEqual(lock.components.frameNodeIds, ["5:100"]);
+  assert.match(lock.components.checksum, /^sha256:[0-9a-f]{64}$/);
+  await fs.access(path.join(repo, lock.components.path));
+});
+
+test("preflight blocks selected snapshot repair when selected frame data is absent", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-preflight-missing-frame-"));
+  const { input, repo } = await createInputFixture(tmp);
+  await writeJson(path.join(input, "dependency-lock.json"), {
+    schemaVersion: "2.0",
+    kind: "pragma-design-dependencies",
+    fileKey: "file-key",
+    capturedAt: "2026-07-06T10:00:00+08:00",
+    pageFrames: [{ nodeId: "1:23", name: "Main", snapshotId: "page-1-23-fixed" }],
+    components: { status: "selected", frameNodeId: "5:100", frameNodeIds: ["5:100"] },
+    assets: { status: "none" },
+    rules: {
+      lockDependencies: true,
+      neverDependOnFloatingLatest: true,
+      ifMissingComponentsAndPageHasInstances: "block",
+      ifMissingAssetsAndPageHasUnresolvedRefs: "block"
+    }
+  });
+  await assert.rejects(
+    run(["design", "preflight", "--input", input, "--repo", repo, "--fix", "--json"]),
+    (error) => {
+      assert.equal(error.code, 2);
+      const result = JSON.parse(error.stdout);
+      assert.equal(result.ok, false);
+      assert.equal(result.issues.some((item) => item.code === "BLOCKING_DEPENDENCY_SNAPSHOT_MISSING"), true);
+      return true;
+    }
+  );
+});
+
 test("source snapshots are content-addressed and reused for identical content", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-source-"));
   const { input, repo } = await createInputFixture(tmp);
@@ -159,6 +300,58 @@ test("source snapshots are content-addressed and reused for identical content", 
   await fs.writeFile(path.join(input, "assets", "icons", "drone.svg"), "<svg viewBox=\"0 0 2 2\"></svg>\n", "utf8");
   const assetThird = JSON.parse((await run(["design", "source", "add", "--role", "assets", "--input", input, "--repo", repo, "--file-key", "file-key", "--frame-node-id", "6:200"])).stdout);
   assert.notEqual(assetThird.snapshotId, assetFirst.snapshotId);
+});
+
+test("validate --source-registry checks registry health and catches broken latest, missing snapshot, and checksum mismatch", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-registry-"));
+  const { input, repo } = await createInputFixture(tmp);
+  const component = JSON.parse((await run(["design", "source", "add", "--role", "components", "--input", input, "--repo", repo, "--file-key", "file-key", "--frame-node-id", "5:100"])).stdout);
+  const asset = JSON.parse((await run(["design", "source", "add", "--role", "assets", "--input", input, "--repo", repo, "--file-key", "file-key", "--frame-node-id", "6:200"])).stdout);
+
+  const healthy = JSON.parse((await run(["design", "validate", "--repo", repo, "--source-registry", "--file-key", "file-key", "--json"])).stdout);
+  assert.equal(healthy.ok, true);
+  assert.deepEqual(healthy.fileKeys, ["file-key"]);
+
+  const registryPath = path.join(repo, ".pragma", "design-sources", "figma", "file-key", "registry.json");
+  const registry = await readJson(registryPath);
+  registry.latest.components = "components-missing";
+  await writeJson(registryPath, registry);
+  await assert.rejects(
+    run(["design", "validate", "--repo", repo, "--source-registry", "--file-key", "file-key", "--json"]),
+    (error) => {
+      assert.equal(error.code, 1);
+      const result = JSON.parse(error.stdout);
+      assert.equal(result.issues.some((issue) => issue.code === "LATEST_POINTER_BROKEN"), true);
+      return true;
+    }
+  );
+
+  registry.latest.components = component.snapshotId;
+  registry.roles.assets[0].path = ".pragma/design-sources/figma/file-key/snapshots/assets-missing";
+  await writeJson(registryPath, registry);
+  await assert.rejects(
+    run(["design", "validate", "--repo", repo, "--source-registry", "--file-key", "file-key", "--json"]),
+    (error) => {
+      assert.equal(error.code, 1);
+      const result = JSON.parse(error.stdout);
+      assert.equal(result.issues.some((issue) => issue.code === "SNAPSHOT_PATH_MISSING"), true);
+      return true;
+    }
+  );
+
+  registry.roles.assets[0].path = asset.path;
+  await writeJson(registryPath, registry);
+  const componentSnapshotFile = path.join(repo, component.path, "normalized", "components.json");
+  await fs.appendFile(componentSnapshotFile, "\n");
+  await assert.rejects(
+    run(["design", "validate", "--repo", repo, "--source-registry", "--file-key", "file-key", "--json"]),
+    (error) => {
+      assert.equal(error.code, 1);
+      const result = JSON.parse(error.stdout);
+      assert.equal(result.issues.some((issue) => issue.code === "SNAPSHOT_CHECKSUM_MISMATCH"), true);
+      return true;
+    }
+  );
 });
 
 test("read blocks design/context development issue when dependent context is missing", async () => {
@@ -226,11 +419,63 @@ test("pack-from-figma-capture runs the full deterministic pipeline", async () =>
   const packed = await run(["design", "pack-from-figma-capture", "--input", input, "--repo", repo, "--threshold-mb", "20"]);
   const packedResult = JSON.parse(packed.stdout);
   assert.equal(packedResult.ok, true);
+  assert.equal(packedResult.preflight.ok, true);
+  assert.equal(packedResult.readSmokeCheck.ok, true);
+  for (const key of ["resolveInputMs", "preflightMs", "ingestMs", "packZipMs", "publishMs", "issueFragmentMs", "validateMs", "readSmokeCheckMs"]) {
+    assert.equal(typeof packedResult.timings[key], "number");
+  }
   assert.equal(packedResult.publishMode, "repo");
   assert.match(packedResult.issueFragmentPath, /issue-fragment\.md$/);
+  assert.match(packedResult.summaryPath, /pipeline-summary\.json$/);
   await fs.access(packedResult.issueFragmentPath);
+  await fs.access(packedResult.summaryPath);
+  const summary = await readJson(packedResult.summaryPath);
+  assert.equal(summary.kind, "pragma-pipeline-summary");
+  assert.equal(summary.preflightSummary.unresolved, 0);
+  assert.equal(summary.readSmokeCheck.ok, true);
   await fs.access(path.join(packedResult.contextDir, "normalized", "pixel-spec.json"));
   await fs.access(path.join(packedResult.contextDir, "validation", "visual-baseline.json"));
+});
+
+test("from-figma returns timings and updates pipeline summary", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-from-figma-"));
+  const { input, repo } = await createInputFixture(tmp);
+  const result = JSON.parse((await run(["design", "from-figma", "--input", input, "--repo", repo, "--threshold-mb", "20"])).stdout);
+  assert.equal(result.ok, true);
+  assert.equal(typeof result.timings.preflightMs, "number");
+  const summary = await readJson(result.summaryPath);
+  assert.equal(summary.command, "design from-figma");
+  assert.equal(typeof summary.timings.readSmokeCheckMs, "number");
+});
+
+test("pack-from-figma-capture automatically runs preflight repair before ingest", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-combo-preflight-"));
+  const { input, repo } = await createInputFixture(tmp);
+  await writeFakePng(path.join(input, "assets", "icons", "drone.png"), 4, 5);
+  await fs.rm(path.join(input, "assets", "icons", "drone.svg"), { force: true });
+  await writeJson(path.join(input, "assets-manifest.json"), {
+    schemaVersion: "2.0",
+    kind: "pragma-design-assets",
+    assets: [{
+      id: "asset-drone-icon",
+      name: "Drone",
+      type: "png",
+      mime: "image/png",
+      path: "icons/drone.png",
+      width: 32,
+      height: 32,
+      checksum: "sha256:plugin-webcrypto-unavailable-24",
+      required: true
+    }]
+  });
+  const packed = await run(["design", "pack-from-figma-capture", "--input", input, "--repo", repo, "--threshold-mb", "20"]);
+  const packedResult = JSON.parse(packed.stdout);
+  assert.equal(packedResult.ok, true);
+  assert.equal(packedResult.preflight.repairs.some((repair) => repair.code === "ASSET_CHECKSUM_REPAIRED"), true);
+  const assets = await readJson(path.join(packedResult.contextDir, "normalized", "assets.json"));
+  assert.equal(assets.assets[0].width, 4);
+  assert.equal(assets.assets[0].height, 5);
+  assert.match(assets.assets[0].checksum, /^sha256:[0-9a-f]{64}$/);
 });
 
 test("ingest and pack-from-figma-capture preserve dependency-lock as normalized dependencies", async () => {
@@ -257,6 +502,50 @@ test("ingest and pack-from-figma-capture preserve dependency-lock as normalized 
   assert.equal(deps.kind, "pragma-design-dependencies");
   assert.equal(deps.components.status, "none");
   assert.equal(deps.pageFrames[0].snapshotId, "page-1-23-fixed");
+});
+
+test("validate --context checks locked dependency snapshots are recoverable from repo registry", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-context-registry-"));
+  const { input, repo } = await createInputFixture(tmp);
+  const component = JSON.parse((await run(["design", "source", "add", "--role", "components", "--input", input, "--repo", repo, "--file-key", "file-key", "--frame-node-id", "5:100"])).stdout);
+  await writeJson(path.join(input, "dependency-lock.json"), {
+    schemaVersion: "2.0",
+    kind: "pragma-dependency-lock",
+    fileKey: "file-key",
+    capturedAt: "2026-07-06T10:00:00+08:00",
+    pageFrames: [{ nodeId: "1:23", name: "Main", snapshotId: "page-1-23-fixed" }],
+    components: {
+      status: "reused",
+      frameNodeId: "5:100",
+      snapshotId: component.snapshotId,
+      path: component.path,
+      checksum: component.checksum
+    },
+    assets: { status: "none" },
+    rules: {
+      lockDependencies: true,
+      neverDependOnFloatingLatest: true,
+      ifMissingComponentsAndPageHasInstances: "block",
+      ifMissingAssetsAndPageHasUnresolvedRefs: "block"
+    }
+  });
+  const packedResult = JSON.parse((await run(["design", "pack-from-figma-capture", "--input", input, "--repo", repo, "--threshold-mb", "20"])).stdout);
+  const healthy = JSON.parse((await run(["design", "validate", "--context", packedResult.contextDir, "--json"])).stdout);
+  assert.equal(healthy.ok, true);
+
+  const registryPath = path.join(repo, ".pragma", "design-sources", "figma", "file-key", "registry.json");
+  const registry = await readJson(registryPath);
+  registry.roles.components[0].checksum = "sha256:0000000000000000000000000000000000000000000000000000000000000000";
+  await writeJson(registryPath, registry);
+  await assert.rejects(
+    run(["design", "validate", "--context", packedResult.contextDir, "--json"]),
+    (error) => {
+      assert.equal(error.code, 1);
+      const result = JSON.parse(error.stdout);
+      assert.equal(result.issues.some((issue) => issue.code === "SNAPSHOT_CHECKSUM_MISMATCH"), true);
+      return true;
+    }
+  );
 });
 
 test("validate rejects broken pixel spec asset references", async () => {

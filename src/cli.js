@@ -10,6 +10,7 @@ import { validateDesignContext } from "./core/validate.js";
 import { packFromFigmaCapture } from "./core/pack-from-figma-capture.js";
 import { enrichAgentContext } from "./core/enrich.js";
 import { fromFigma } from "./core/from-figma.js";
+import { preflightFigmaCapture } from "./core/preflight.js";
 import { addDesignSourceSnapshot, prepareFigmaCapture, syncDesignSources } from "./core/source-registry.js";
 
 function parseArgs(argv) {
@@ -46,6 +47,7 @@ function help() {
   return `Pragma 2.0 MVP\n\n` +
     `Commands:\n` +
     `  pragma design prepare-figma-capture --url <figma-url> --repo <repo> --page <node> [--components <node>|none] [--assets <node>|none] [--json]\n` +
+    `  pragma design preflight --input <pragma-input> --repo <repo> [--fix] [--json]\n` +
     `  pragma design from-figma --input <pragma-input> --repo <repo> [--force] [--json]\n` +
     `  pragma design source add --role components|assets --input <dir> --repo <repo> --file-key <key> --frame-node-id <node> [--dry-run] [--json]\n` +
     `  pragma design source sync --input <dir> --repo <repo> --file-key <key> [--components-frame <node>] [--assets-frame <node>] [--dry-run] [--json]\n` +
@@ -57,7 +59,8 @@ function help() {
     `  pragma design enrich --context <dir> --notes <text> [--generated-by <id>] [--model <model>]\n` +
     `  pragma design read --context <dir> | --repo <repo> --issue 102 | --dev-issue-file issue.md\n` +
     `  pragma design asset --context <dir> --id <asset-id> [--copy-to <path>]\n` +
-    `  pragma design validate --context <dir> [--json]\n`;
+    `  pragma design validate --context <dir> [--json]\n` +
+    `  pragma design validate --repo <repo> --source-registry [--file-key <fileKey>] [--json]\n`;
 }
 
 function printJson(value) {
@@ -78,6 +81,19 @@ async function main(argv) {
     case "prepare-figma-capture": {
       const result = await prepareFigmaCapture(options);
       printJson(result);
+      if (!result.ok) process.exitCode = 2;
+      return;
+    }
+    case "preflight": {
+      const result = await preflightFigmaCapture(options);
+      if (options.json) {
+        printJson(result);
+      } else if (result.ok) {
+        process.stdout.write(`OK: ${result.inputDir}\n`);
+        for (const repair of result.repairs) process.stdout.write(`Fixed: ${repair.message}\n`);
+      } else {
+        process.stderr.write(`Preflight failed:\n- ${result.issues.filter((item) => !item.fixed).map((item) => `${item.category} ${item.code}: ${item.message}`).join("\n- ")}\n`);
+      }
       if (!result.ok) process.exitCode = 2;
       return;
     }
@@ -171,12 +187,13 @@ async function main(argv) {
       return;
     }
     case "validate": {
-      if (!options.context) throw new CliError("--context is required for design validate.");
+      if (!options.context && !(options["source-registry"] || options.sourceRegistry)) throw new CliError("--context is required for design validate unless --source-registry is used.");
+      if ((options["source-registry"] || options.sourceRegistry) && !options.repo) throw new CliError("--repo is required for design validate --source-registry.");
       const result = await validateDesignContext(options);
       if (options.json) {
         printJson(result);
       } else if (result.ok) {
-        process.stdout.write(`OK: ${result.contextDir}\n`);
+        process.stdout.write(`OK: ${result.contextDir || result.repoRoot}\n`);
         for (const warning of result.warnings) process.stderr.write(`Warning: ${warning}\n`);
       } else {
         process.stderr.write(`Validation failed:\n- ${result.errors.join("\n- ")}\n`);

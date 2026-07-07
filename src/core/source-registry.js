@@ -214,7 +214,8 @@ async function materializeSnapshot({ role, inputDir, snapshotDir }) {
 }
 
 function frameNameFromInput(capture, role, frameNodeId) {
-  const roleFrame = capture.figma?.frames?.[role];
+  const roleFrames = asArray(capture.figma?.frames?.[role]);
+  const roleFrame = roleFrames.find((frame) => normalizeFigmaNodeId(frame.nodeId || frame.id) === frameNodeId) || roleFrames[0];
   if (roleFrame?.name) return roleFrame.name;
   const nodes = asArray(capture.figma?.frames?.page).concat(asArray(capture.figma?.nodeIds).map((nodeId) => ({ nodeId })));
   return nodes.find((node) => normalizeFigmaNodeId(node.nodeId || node.id) === frameNodeId)?.name;
@@ -229,7 +230,8 @@ export async function addDesignSourceSnapshot(options) {
   const repoPath = repoPathFromOptions(options, capture);
   const role = String(options.role || options.type || "").toLowerCase();
   if (!ROLES.has(role)) throw new CliError("--role must be components or assets.");
-  const frameNodeId = normalizeFigmaNodeId(options.frame || options["frame-node-id"] || options.frameNodeId || options[`${role}-frame`] || capture.figma?.frames?.[role]?.nodeId || parsedUrl.nodeId);
+  const captureRoleFrame = asArray(capture.figma?.frames?.[role])[0];
+  const frameNodeId = normalizeFigmaNodeId(options.frame || options["frame-node-id"] || options.frameNodeId || options[`${role}-frame`] || captureRoleFrame?.nodeId || captureRoleFrame?.id || parsedUrl.nodeId);
   if (!frameNodeId) throw new CliError("--frame-node-id is required for source add/sync snapshots.");
 
   const content = role === "components" ? await buildComponentsSnapshot(inputDir) : await buildAssetsContentKey(inputDir);
@@ -258,7 +260,7 @@ export async function addDesignSourceSnapshot(options) {
   };
 
   if (options["dry-run"] || options.dryRun) {
-    return { ok: true, dryRun: true, role, fileKey, snapshotId: entry.snapshotId, path: entry.path, checksum: entry.checksum, reused: Boolean(existing), created: false };
+    return { ok: true, dryRun: true, role, fileKey, frameNodeId, snapshotId: entry.snapshotId, path: entry.path, checksum: entry.checksum, reused: Boolean(existing), created: false };
   }
 
   if (!existing && !(await pathExists(absPath))) {
@@ -276,7 +278,7 @@ export async function addDesignSourceSnapshot(options) {
     checksum: entry.checksum
   });
 
-  return { ok: true, dryRun: false, role, fileKey, snapshotId: entry.snapshotId, path: entry.path, checksum: entry.checksum, reused: Boolean(existing), created: !existing };
+  return { ok: true, dryRun: false, role, fileKey, frameNodeId, snapshotId: entry.snapshotId, path: entry.path, checksum: entry.checksum, reused: Boolean(existing), created: !existing };
 }
 
 export async function syncDesignSources(options) {
