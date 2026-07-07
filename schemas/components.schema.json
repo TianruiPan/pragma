@@ -1,0 +1,57 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pragma.local/schemas/pragma-2.0/components.schema.json",
+  "title": "Pragma 2.0 Components",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "kind",
+    "instances",
+    "componentSets"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "2.0" },
+    "kind": { "enum": ["pragma-components", "pragma-design-components"] },
+    "instances": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["nodeId", "figmaNodeId", "name", "bounds"],
+        "properties": {
+          "nodeId": { "type": "string" },
+          "figmaNodeId": { "type": "string" },
+          "name": { "type": "string" },
+          "mainComponentNodeId": { "type": "string" },
+          "componentSetId": { "type": "string" },
+          "variant": { "type": "object" },
+          "bounds": { "type": "object" },
+          "definitionSource": { "type": "string" },
+          "optional": { "type": "boolean" },
+          "external": { "type": "boolean" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "componentSets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "source": { "type": "string" },
+          "snapshotId": { "type": "string" },
+          "variants": { "type": "array" },
+          "states": { "type": "array" },
+          "optional": { "type": "boolean" },
+          "external": { "type": "boolean" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "codeConnect": { "type": "array" },
+    "components": { "type": "array" }
+  },
+  "additionalProperties": true
+}

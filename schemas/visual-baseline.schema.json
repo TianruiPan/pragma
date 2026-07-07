@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pragma.local/schemas/pragma-2.0/visual-baseline.schema.json",
+  "title": "Pragma 2.0 Visual Baseline",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "kind",
+    "viewports",
+    "strategy",
+    "humanReviewRequired"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "2.0"
+    },
+    "kind": {
+      "const": "pragma-visual-baseline"
+    },
+    "viewports": {
+      "type": "array"
+    },
+    "strategy": {
+      "type": "string"
+    },
+    "humanReviewRequired": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": true
+}

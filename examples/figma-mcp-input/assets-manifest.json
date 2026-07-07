@@ -14,10 +14,10 @@
       "id": "asset-panel-bg",
       "name": "Panel background placeholder",
       "role": "panel-background",
-      "type": "webp",
-      "path": "images/panel-bg.webp",
-      "width": 320,
-      "height": 180,
+      "type": "png",
+      "path": "images/panel-bg.png",
+      "width": 1,
+      "height": 1,
       "required": false
     }
   ]

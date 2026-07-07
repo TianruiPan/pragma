@@ -15,3 +15,7 @@ Checksum：sha256:<manifest-checksum>
 ```
 
 If the full package is stored in Gitea Generic Package Registry, `Package` includes the registry download URL.
+
+The fragment intentionally does not inline pixel facts. Development Agents must follow the manifest entrypoints and read `normalized/pixel-spec.json`, `normalized/dependencies.json`, assets, tokens, components, render instructions, source evidence, screenshots, and visual baseline from the package.
+
+Dependency locks are package facts, not Issue body content. The Issue fragment should point to the manifest/package; the concrete shared snapshot IDs and checksums live in `normalized/dependencies.json`.

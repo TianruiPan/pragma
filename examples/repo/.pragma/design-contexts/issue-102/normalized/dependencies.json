@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-design-dependencies",
+  "fileKey": "demoFigmaFileKey",
+  "capturedAt": "2026-07-06T10:00:00+08:00",
+  "pageFrames": [
+    {
+      "nodeId": "1:23",
+      "name": "Map monitoring page",
+      "snapshotId": "page-1-23-demo"
+    }
+  ],
+  "components": {
+    "status": "reused",
+    "frameNodeId": "5:100",
+    "snapshotId": "components-5-100-e4a9d25a13f8",
+    "path": ".pragma/design-sources/figma/demoFigmaFileKey/snapshots/components-5-100-e4a9d25a13f8",
+    "checksum": "sha256:e4a9d25a13f8bf56d4ab208d3d7846d555c46c05d5d9eb404c5ccd4c845b21db"
+  },
+  "assets": {
+    "status": "reused",
+    "frameNodeId": "6:200",
+    "snapshotId": "assets-6-200-a25a4e1e4449",
+    "path": ".pragma/design-sources/figma/demoFigmaFileKey/snapshots/assets-6-200-a25a4e1e4449",
+    "checksum": "sha256:a25a4e1e44497962f5dde88ca9ce7d70b4ac418ad314341086ecd36730a46496"
+  },
+  "rules": {
+    "lockDependencies": true,
+    "neverDependOnFloatingLatest": true,
+    "ifMissingComponentsAndPageHasInstances": "block",
+    "ifMissingAssetsAndPageHasUnresolvedRefs": "block"
+  }
+}

@@ -1,10 +1,12 @@
 {
   "components": [
     {
+      "id": "component-filter-bar",
       "name": "FilterTab",
       "variants": ["default", "active", "disabled"]
     },
     {
+      "id": "component-warning-card",
       "name": "WarningCard",
       "variants": ["normal", "critical"]
     }

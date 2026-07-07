@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pragma.local/schemas/pragma-2.0/tokens.schema.json",
+  "title": "Pragma 2.0 Design Tokens",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "kind",
+    "tokens"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "2.0"
+    },
+    "kind": {
+      "const": "pragma-design-tokens"
+    },
+    "tokens": {
+      "type": "array"
+    }
+  },
+  "additionalProperties": true
+}

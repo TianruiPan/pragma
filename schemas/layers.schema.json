@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pragma.local/schemas/pragma-2.0/layers.schema.json",
+  "title": "Pragma 2.0 Layer Tree",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "kind",
+    "rootNodeIds",
+    "nodes"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "2.0"
+    },
+    "kind": {
+      "const": "pragma-layer-tree"
+    },
+    "rootNodeIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "nodes": {
+      "type": "array"
+    }
+  },
+  "additionalProperties": true
+}

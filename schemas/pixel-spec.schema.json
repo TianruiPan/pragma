@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pragma.local/schemas/pragma-2.0/pixel-spec.schema.json",
+  "title": "Pragma 2.0 Pixel Spec",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "kind",
+    "id",
+    "viewport",
+    "nodes",
+    "assetBindings",
+    "states",
+    "dynamicRegions"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "2.0"
+    },
+    "kind": {
+      "const": "pragma-pixel-spec"
+    },
+    "id": {
+      "type": "string"
+    },
+    "viewport": {
+      "type": "object"
+    },
+    "nodes": {
+      "type": "array"
+    },
+    "assetBindings": {
+      "type": "array"
+    },
+    "states": {
+      "type": "array"
+    },
+    "dynamicRegions": {
+      "type": "array"
+    }
+  },
+  "additionalProperties": true
+}

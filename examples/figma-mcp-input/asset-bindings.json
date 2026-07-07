@@ -1,0 +1,18 @@
+{
+  "bindings": [
+    {
+      "assetId": "asset-drone-icon",
+      "figmaNodeId": "1:40",
+      "fit": "contain",
+      "crop": null,
+      "placement": { "x": 920, "y": 520, "width": 32, "height": 32 }
+    },
+    {
+      "assetId": "asset-panel-bg",
+      "figmaNodeId": "1:50",
+      "fit": "cover",
+      "crop": { "x": 0, "y": 0, "width": 1, "height": 1 },
+      "placement": { "x": 1544, "y": 96, "width": 352, "height": 880 }
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pragma.local/schemas/pragma-2.0/dependencies.schema.json",
+  "title": "Pragma 2.0 Design Dependencies",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "fileKey", "capturedAt", "pageFrames", "components", "assets", "rules"],
+  "properties": {
+    "schemaVersion": { "const": "2.0" },
+    "kind": { "const": "pragma-design-dependencies" },
+    "fileKey": { "type": "string" },
+    "capturedAt": { "type": "string" },
+    "pageFrames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["nodeId", "snapshotId"],
+        "properties": {
+          "nodeId": { "type": "string" },
+          "name": { "type": "string" },
+          "snapshotId": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "components": { "$ref": "#/$defs/dependencyRole" },
+    "assets": { "$ref": "#/$defs/dependencyRole" },
+    "rules": {
+      "type": "object",
+      "properties": {
+        "lockDependencies": { "type": "boolean" },
+        "neverDependOnFloatingLatest": { "type": "boolean" },
+        "ifMissingComponentsAndPageHasInstances": { "type": "string" },
+        "ifMissingAssetsAndPageHasUnresolvedRefs": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "dependencyRole": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["selected", "reused", "missing", "none"] },
+        "frameNodeId": { "type": "string" },
+        "snapshotId": { "type": "string" },
+        "path": { "type": "string" },
+        "checksum": { "type": "string", "pattern": "^sha256:" },
+        "name": { "type": "string" },
+        "optional": { "type": "boolean" },
+        "external": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

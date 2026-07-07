@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-design-checksums",
+  "algorithm": "sha256",
+  "generatedAt": "2026-07-07T08:13:11.746Z",
+  "files": [
+    {
+      "path": "assets/icons/drone.svg",
+      "checksum": "sha256:677b1766d6fec7113f6a7f39cc8c2f00500788c20623a6205ce24cfcb48b348d"
+    },
+    {
+      "path": "assets/images/panel-bg.png",
+      "checksum": "sha256:4b5c5c92cec3b23e6a294fc0eea43234ef5126c5a64f4c6c531ac8430ab0b844"
+    },
+    {
+      "path": "capture.json",
+      "checksum": "sha256:60874d86f56c6772cb298326b49156f10be83558158c21250225e0c81ed68381"
+    },
+    {
+      "path": "normalized/assets.json",
+      "checksum": "sha256:744ece64be9b277070e60be07d60ea73bd63c9073e49f8c0451bd583eacc05e5"
+    }
+  ]
+}

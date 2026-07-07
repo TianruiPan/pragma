@@ -2,55 +2,95 @@
   "schemaVersion": "2.0",
   "kind": "pragma-design-checksums",
   "algorithm": "sha256",
-  "generatedAt": "2026-07-06T11:27:53.725Z",
+  "generatedAt": "2026-07-07T08:13:14.678Z",
   "files": [
     {
       "path": "assets/icons/drone.svg",
       "checksum": "sha256:677b1766d6fec7113f6a7f39cc8c2f00500788c20623a6205ce24cfcb48b348d"
     },
     {
-      "path": "assets/images/panel-bg.webp",
-      "checksum": "sha256:2c4fefd6eff969d3d8d3ce59a1cbcc47012ad69634f5b48db894bc25d606001e"
+      "path": "assets/images/panel-bg.png",
+      "checksum": "sha256:4b5c5c92cec3b23e6a294fc0eea43234ef5126c5a64f4c6c531ac8430ab0b844"
+    },
+    {
+      "path": "context.zip",
+      "checksum": "sha256:a3ffb326cea7d424ec4cc9d6f92c286ca88c0ef10c5deda25f7215a89f92aa5a"
     },
     {
       "path": "handoff/README.md",
-      "checksum": "sha256:a1ece5d82243237f65b9af5c25a26e949ce1a4f2444d62db1602727e7f6c2394"
+      "checksum": "sha256:498322a543de592734fec82d30d0a125c9bec71530412a105120d976d877cbb9"
     },
     {
       "path": "manifest.json",
-      "checksum": "sha256:6b2c02e1830220ef028378f046122644dbbc36fcc5799b50d52a0facd3f1726c"
+      "checksum": "sha256:9e9b2938015ba09aea23166770bff188b7e58f0c929a033323838dc0caa46721"
     },
     {
       "path": "normalized/agent-context.md",
-      "checksum": "sha256:eef1dfd787ae3e3a3789e99dd014e3639ee1e2d2ada914e692f80a218afc6a15"
+      "checksum": "sha256:dc040d80dede9adf49581fcf5513bff48492e157937c167e60bd0f9a2d9b9af0"
     },
     {
       "path": "normalized/assets.json",
-      "checksum": "sha256:f024442015b9d3c543b1af095180d283841c7018aa75724b25899efb1edbafd1"
+      "checksum": "sha256:06a2ebf8a2a5652808f9d46a7025754f1855aa2cef5c446e3d8406d1ff9046fb"
+    },
+    {
+      "path": "normalized/components.json",
+      "checksum": "sha256:509817350d14e9ce571f0b023a62f00e4a99da53daf8b44638d90a30643e3938"
+    },
+    {
+      "path": "normalized/dependencies.json",
+      "checksum": "sha256:dc3c18a5a251ebc2ef595232bfdf3bd513267d0ca29be8796064abf0d4c66a6d"
     },
     {
       "path": "normalized/design-context.json",
-      "checksum": "sha256:3577aa8720e2268b55f39548dd0b4589d03952d448fce4f2c9ae79cb20b2be24"
+      "checksum": "sha256:de3af9233e24f1d60aeca441a0e811685e1b5733ea648a97ae972f52f6d1eabd"
+    },
+    {
+      "path": "normalized/layers.json",
+      "checksum": "sha256:cfd8ee1539d4d4bd6e2faf0a89078a138f2ee91cfc19e22cb137a6f56cc39d39"
+    },
+    {
+      "path": "normalized/pixel-spec.json",
+      "checksum": "sha256:462f5ffd871122aa0e4483757422827bcb561a346fe744a14299160b90755f94"
+    },
+    {
+      "path": "normalized/render-instructions.md",
+      "checksum": "sha256:343558635faacbbd2189fb238cb8dde5a2ba09c9e2772971a6adb642a8e74a9d"
+    },
+    {
+      "path": "normalized/tokens.json",
+      "checksum": "sha256:9b9d971ee7a1230b85d87d7cc0ea6cb018c198841013dcddda25a718638bb4be"
     },
     {
       "path": "screenshots/main-frame.webp",
       "checksum": "sha256:fe748ff295da0aefd2d065b75d26ad634e71c8c5110852b043733378500b9198"
     },
     {
+      "path": "source/asset-bindings.json",
+      "checksum": "sha256:a11cbf32d3feec80932e311647418593cce11e42f535cd3a96445d8b2e963747"
+    },
+    {
       "path": "source/assets-manifest.json",
-      "checksum": "sha256:9b3c1030c57559d35c47bd05753fa7514b9900b92ff0a3eae0c2f53b62a7f77b"
+      "checksum": "sha256:31691c9222ce15cbb37b93910e0c5980ba7d8656d7650b4ecf46f9114c320257"
     },
     {
       "path": "source/capture.json",
       "checksum": "sha256:d96d4271ae52d57ee72538cb735f679678772eb090d418e6fc6a5a2f2d0ca568"
     },
     {
+      "path": "source/dependency-lock.json",
+      "checksum": "sha256:19eb45e2975f81a103c9a4fc1d63e8988bbcdf3e035a46e9ab741d5887d1a3b0"
+    },
+    {
       "path": "source/figma-components.json",
-      "checksum": "sha256:807511a9f337d99b4fd612c2b539c8411c929fccdb7d759199fc90ca46de57ce"
+      "checksum": "sha256:b1bfe98ed00b2cc2fe5f6aaf53e3c6a13eeee2a58a1419f3cf728cc7090c4298"
     },
     {
       "path": "source/figma-get-design-context.md",
       "checksum": "sha256:f5248a56606cbf7171c3e16db32ee1b01553e3648a9432f667c5e418681d3b04"
+    },
+    {
+      "path": "source/figma-layers.json",
+      "checksum": "sha256:5c6fe2f0cc87ea166df47fc3a53aeaa753013f92f8bb5d295394498171ba87a4"
     },
     {
       "path": "source/figma-metadata.json",
@@ -63,6 +103,10 @@
     {
       "path": "source/figma-variables.json",
       "checksum": "sha256:5a9e3efb3ca756b82136eefd500517af78f4d276034010b00852833f31f6bb1d"
+    },
+    {
+      "path": "validation/visual-baseline.json",
+      "checksum": "sha256:94136b45bb273e78a7a2961ce6178c2dc29c6c3228850390d05ea46fc9d07a62"
     }
   ]
 }

@@ -3,25 +3,98 @@
   "$id": "https://pragma.local/schemas/pragma-2.0/assets.schema.json",
   "title": "Pragma 2.0 Design Assets Manifest",
   "type": "object",
-  "required": ["schemaVersion", "kind", "assets"],
+  "required": [
+    "schemaVersion",
+    "kind",
+    "assets"
+  ],
   "properties": {
-    "schemaVersion": { "const": "2.0" },
-    "kind": { "const": "pragma-design-assets" },
+    "schemaVersion": {
+      "const": "2.0"
+    },
+    "kind": {
+      "const": "pragma-design-assets"
+    },
     "assets": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name", "type", "path", "checksum"],
+          "required": [
+            "id",
+            "name",
+            "type",
+            "mime",
+            "path",
+            "checksum"
+          ],
         "properties": {
-          "id": { "type": "string" },
-          "name": { "type": "string" },
-          "role": { "type": "string" },
-          "type": { "type": "string" },
-          "path": { "type": "string" },
-          "width": { "type": "number" },
-          "height": { "type": "number" },
-          "checksum": { "type": "string", "pattern": "^sha256:" },
-          "required": { "type": "boolean" }
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "width": {
+            "type": "number"
+          },
+          "height": {
+            "type": "number"
+          },
+          "checksum": {
+            "type": "string",
+            "pattern": "^sha256:"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "sourceNodeIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bindings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "fit"
+              ],
+              "properties": {
+                "nodeId": {
+                  "type": "string"
+                },
+                "figmaNodeId": {
+                  "type": "string"
+                },
+                "fit": {
+                  "type": "string"
+                },
+                "crop": {
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
+                "placement": {
+                  "type": "object"
+                }
+              },
+              "additionalProperties": true
+            }
+          }
         },
         "additionalProperties": true
       }

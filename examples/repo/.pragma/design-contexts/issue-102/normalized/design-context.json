@@ -23,7 +23,8 @@
     "nodes": [
       "1:23"
     ],
-    "url": "https://www.figma.com/design/demoFigmaFileKey/Demo?node-id=1-23"
+    "url": "https://www.figma.com/design/demoFigmaFileKey/Demo?node-id=1-23",
+    "originalNodeId": "1:23"
   },
   "frames": [
     {
@@ -47,5 +48,7 @@
     }
   ],
   "assetsManifest": "normalized/assets.json",
+  "dependencies": "normalized/dependencies.json",
+  "pixelSpec": "normalized/pixel-spec.json",
   "agentContext": "normalized/agent-context.md"
 }

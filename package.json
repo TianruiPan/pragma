@@ -11,9 +11,10 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test",
+    "test": "node --test test/*.mjs",
     "sample:ingest": "node src/cli.js design ingest --input examples/figma-mcp-input --repo examples/repo --force",
     "sample:validate": "node src/cli.js design validate --context examples/repo/.pragma/design-contexts/issue-102",
-    "sample:read": "node src/cli.js design read --repo examples/repo --issue 102 --summary-only"
+    "sample:read": "node src/cli.js design read --repo examples/repo --issue 102 --summary-only",
+    "sample:pack-from-figma-capture": "node src/cli.js design pack-from-figma-capture --input examples/figma-mcp-input --repo examples/repo --force --threshold-mb 20"
   }
 }

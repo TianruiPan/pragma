@@ -1,0 +1,56 @@
+{
+  "rootNodeIds": ["1:23"],
+  "nodes": [
+    {
+      "figmaNodeId": "1:23",
+      "name": "Map Monitoring Page",
+      "type": "FRAME",
+      "bounds": { "x": 0, "y": 0, "width": 1920, "height": 1080 },
+      "layout": { "position": "absolute", "overflow": "visible" },
+      "fills": [{ "type": "solid", "color": "#07131C", "opacity": 1 }],
+      "children": ["1:24", "1:30", "1:40", "1:50"]
+    },
+    {
+      "figmaNodeId": "1:24",
+      "name": "Top Filter Bar",
+      "type": "FRAME",
+      "bounds": { "x": 24, "y": 24, "width": 760, "height": 64 },
+      "layout": { "mode": "horizontal", "position": "absolute", "gap": 12, "padding": { "top": 8, "right": 12, "bottom": 8, "left": 12 } },
+      "fills": [{ "type": "solid", "color": "#0D2636", "opacity": 0.92 }],
+      "strokes": [{ "color": "#2A5D77", "width": 1, "position": "inside" }],
+      "radius": 12,
+      "componentRef": { "componentId": "component-filter-bar", "variant": { "size": "default" } },
+      "children": ["1:25"]
+    },
+    {
+      "figmaNodeId": "1:25",
+      "name": "Filter Label",
+      "type": "TEXT",
+      "bounds": { "x": 48, "y": 44, "width": 96, "height": 24 },
+      "text": { "content": "Region", "fontFamily": "Source Han Sans SC", "fontWeight": 500, "fontSize": 16, "lineHeight": 24, "letterSpacing": 0, "align": "left", "color": "#EAF7FF" }
+    },
+    {
+      "figmaNodeId": "1:30",
+      "name": "Dynamic Map Surface",
+      "type": "FRAME",
+      "bounds": { "x": 0, "y": 0, "width": 1920, "height": 1080 },
+      "fills": [{ "type": "solid", "color": "#09202E", "opacity": 1 }]
+    },
+    {
+      "figmaNodeId": "1:40",
+      "name": "Drone Marker Icon",
+      "type": "IMAGE",
+      "bounds": { "x": 920, "y": 520, "width": 32, "height": 32 },
+      "fills": []
+    },
+    {
+      "figmaNodeId": "1:50",
+      "name": "Right Event Drawer",
+      "type": "FRAME",
+      "bounds": { "x": 1544, "y": 96, "width": 352, "height": 880 },
+      "fills": [{ "type": "solid", "color": "#0D2636", "opacity": 0.88 }],
+      "radius": 16,
+      "componentRef": { "componentId": "component-warning-card", "variant": { "severity": "normal" } }
+    }
+  ]
+}

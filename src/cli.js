@@ -7,6 +7,10 @@ import { createIssueFragment } from "./core/issue-fragment.js";
 import { readDesignContext } from "./core/read.js";
 import { resolveDesignAsset } from "./core/asset.js";
 import { validateDesignContext } from "./core/validate.js";
+import { packFromFigmaCapture } from "./core/pack-from-figma-capture.js";
+import { enrichAgentContext } from "./core/enrich.js";
+import { fromFigma } from "./core/from-figma.js";
+import { addDesignSourceSnapshot, prepareFigmaCapture, syncDesignSources } from "./core/source-registry.js";
 
 function parseArgs(argv) {
   const options = {};
@@ -41,10 +45,16 @@ function parseArgs(argv) {
 function help() {
   return `Pragma 2.0 MVP\n\n` +
     `Commands:\n` +
+    `  pragma design prepare-figma-capture --url <figma-url> --repo <repo> --page <node> [--components <node>|none] [--assets <node>|none] [--json]\n` +
+    `  pragma design from-figma --input <pragma-input> --repo <repo> [--force] [--json]\n` +
+    `  pragma design source add --role components|assets --input <dir> --repo <repo> --file-key <key> --frame-node-id <node> [--dry-run] [--json]\n` +
+    `  pragma design source sync --input <dir> --repo <repo> --file-key <key> [--components-frame <node>] [--assets-frame <node>] [--dry-run] [--json]\n` +
     `  pragma design ingest --input <dir> --repo <repo> [--issue 102] [--force]\n` +
     `  pragma design pack --context <dir> [--zip <path>]\n` +
-    `  pragma design publish --context <dir> [--threshold-mb 20] [--dry-run]\n` +
+    `  pragma design publish --context <dir> [--threshold-mb 20] [--dry-run] [--prune-repo]\n` +
     `  pragma design issue-fragment --context <dir> [--output fragment.md]\n` +
+    `  pragma design pack-from-figma-capture --input <dir> --repo <repo> [--force] [--issue-fragment-output fragment.md]\n` +
+    `  pragma design enrich --context <dir> --notes <text> [--generated-by <id>] [--model <model>]\n` +
     `  pragma design read --context <dir> | --repo <repo> --issue 102 | --dev-issue-file issue.md\n` +
     `  pragma design asset --context <dir> --id <asset-id> [--copy-to <path>]\n` +
     `  pragma design validate --context <dir> [--json]\n`;
@@ -63,8 +73,33 @@ async function main(argv) {
   if (scope !== "design") {
     throw new CliError(`Unknown scope: ${scope}. Only "design" is supported in the MVP.`);
   }
-  const { options } = parseArgs(rest);
+  const { options, positionals } = parseArgs(rest);
   switch (command) {
+    case "prepare-figma-capture": {
+      const result = await prepareFigmaCapture(options);
+      printJson(result);
+      if (!result.ok) process.exitCode = 2;
+      return;
+    }
+    case "from-figma": {
+      const result = await fromFigma(options);
+      printJson(result);
+      return;
+    }
+    case "source": {
+      const action = positionals[0];
+      if (action === "add") {
+        const result = await addDesignSourceSnapshot(options);
+        printJson({ command: "design source add", ...result });
+        return;
+      }
+      if (action === "sync") {
+        const result = await syncDesignSources(options);
+        printJson({ command: "design source sync", ...result });
+        return;
+      }
+      throw new CliError(`Unknown design source action: ${action || "<missing>"}. Use "add" or "sync".`);
+    }
     case "ingest": {
       if (!options.input) throw new CliError("--input is required for design ingest.");
       const result = await ingestDesignContext(options);
@@ -89,6 +124,16 @@ async function main(argv) {
       process.stdout.write(result.markdown);
       return;
     }
+    case "pack-from-figma-capture": {
+      const result = await packFromFigmaCapture(options);
+      printJson({ ok: true, command: "design pack-from-figma-capture", ...result });
+      return;
+    }
+    case "enrich": {
+      const result = await enrichAgentContext(options);
+      printJson({ ok: true, command: "design enrich", ...result });
+      return;
+    }
     case "read": {
       const result = await readDesignContext(options);
       if (options.json) {
@@ -105,12 +150,18 @@ async function main(argv) {
           manifestPath: result.manifestPath,
           agentContextPath: result.agentContextPath,
           designContextPath: result.designContextPath,
+          pixelSpecPath: result.pixelSpecPath,
           assetsPath: result.assetsPath,
+          dependenciesPath: result.dependenciesPath,
+          tokensPath: result.tokensPath,
+          componentsPath: result.componentsPath,
+          renderInstructionsPath: result.renderInstructionsPath,
+          visualBaselinePath: result.visualBaselinePath,
           artifact: result.manifest.artifact
         });
         return;
       }
-      process.stdout.write(`# Pragma Design Context\n\nManifest: ${result.manifestPath}\nAgent context: ${result.agentContextPath}\n\n---\n\n${result.agentContext}\n`);
+      process.stdout.write(`# Pragma Design Context\n\nManifest: ${result.manifestPath}\nAgent context: ${result.agentContextPath}\nPixel spec: ${result.pixelSpecPath}\n\n---\n\n${result.agentContext}\n`);
       return;
     }
     case "asset": {
@@ -139,8 +190,13 @@ async function main(argv) {
 }
 
 main(process.argv.slice(2)).catch((error) => {
+  const wantsJson = process.argv.slice(2).includes("--json");
   if (error instanceof CliError) {
-    process.stderr.write(`${error.message}\n`);
+    if (wantsJson) {
+      process.stderr.write(`${JSON.stringify({ ok: false, code: error.code, message: error.message, details: error.details }, null, 2)}\n`);
+    } else {
+      process.stderr.write(`${error.message}\n`);
+    }
     process.exit(error.exitCode);
   }
   process.stderr.write(`${error.stack || error.message}\n`);

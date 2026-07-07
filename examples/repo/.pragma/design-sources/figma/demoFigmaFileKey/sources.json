@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-design-sources",
+  "fileKey": "demoFigmaFileKey",
+  "sources": [
+    {
+      "role": "components",
+      "snapshotId": "components-5-100-e4a9d25a13f8",
+      "frameNodeId": "5:100",
+      "inputDir": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\figma-mcp-input",
+      "capturedAt": "2026-07-06T10:00:00+08:00",
+      "checksum": "sha256:e4a9d25a13f8bf56d4ab208d3d7846d555c46c05d5d9eb404c5ccd4c845b21db"
+    },
+    {
+      "role": "assets",
+      "snapshotId": "assets-6-200-a25a4e1e4449",
+      "frameNodeId": "6:200",
+      "inputDir": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\figma-mcp-input",
+      "capturedAt": "2026-07-06T10:00:00+08:00",
+      "checksum": "sha256:a25a4e1e44497962f5dde88ca9ce7d70b4ac418ad314341086ecd36730a46496"
+    }
+  ]
+}

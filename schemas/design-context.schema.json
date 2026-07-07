@@ -3,19 +3,49 @@
   "$id": "https://pragma.local/schemas/pragma-2.0/design-context.schema.json",
   "title": "Pragma 2.0 Design Context",
   "type": "object",
-  "required": ["schemaVersion", "kind", "id", "summary", "source", "frames", "assetsManifest", "agentContext"],
+  "required": [
+    "schemaVersion",
+    "kind",
+    "id",
+    "summary",
+    "source",
+    "frames",
+    "assetsManifest",
+    "agentContext",
+    "pixelSpec",
+    "dependencies"
+  ],
   "properties": {
-    "schemaVersion": { "const": "2.0" },
-    "kind": { "const": "pragma-design-context" },
-    "id": { "type": "string" },
-    "summary": { "type": "string" },
+    "schemaVersion": {
+      "const": "2.0"
+    },
+    "kind": {
+      "const": "pragma-design-context"
+    },
+    "id": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
     "source": {
       "type": "object",
-      "required": ["provider"],
+      "required": [
+        "provider"
+      ],
       "properties": {
-        "provider": { "type": "string" },
-        "fileKey": { "type": "string" },
-        "nodes": { "type": "array", "items": { "type": "string" } }
+        "provider": {
+          "type": "string"
+        },
+        "fileKey": {
+          "type": "string"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       },
       "additionalProperties": true
     },
@@ -23,28 +53,65 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name"],
+        "required": [
+          "id",
+          "name"
+        ],
         "properties": {
-          "id": { "type": "string" },
-          "figmaNodeId": { "type": "string" },
-          "name": { "type": "string" },
+          "id": {
+            "type": "string"
+          },
+          "figmaNodeId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
           "viewport": {
             "type": "object",
             "properties": {
-              "width": { "type": "number" },
-              "height": { "type": "number" }
+              "width": {
+                "type": "number"
+              },
+              "height": {
+                "type": "number"
+              }
             },
             "additionalProperties": true
           },
-          "screenshot": { "type": "string" }
+          "screenshot": {
+            "type": "string"
+          }
         },
         "additionalProperties": true
       }
     },
-    "sections": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
-    "dynamicRegions": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
-    "assetsManifest": { "type": "string" },
-    "agentContext": { "type": "string" }
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "dynamicRegions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "assetsManifest": {
+      "type": "string"
+    },
+    "agentContext": {
+      "type": "string"
+    },
+    "pixelSpec": {
+      "type": "string"
+    },
+    "dependencies": {
+      "type": "string"
+    }
   },
   "additionalProperties": true
 }

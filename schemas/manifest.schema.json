@@ -3,27 +3,62 @@
   "$id": "https://pragma.local/schemas/pragma-2.0/manifest.schema.json",
   "title": "Pragma 2.0 Design Context Package Manifest",
   "type": "object",
-  "required": ["schemaVersion", "kind", "id", "issue", "source", "entrypoints"],
+  "required": [
+    "schemaVersion",
+    "kind",
+    "id",
+    "issue",
+    "source",
+    "entrypoints"
+  ],
   "properties": {
-    "schemaVersion": { "const": "2.0" },
-    "kind": { "const": "pragma-design-context-package" },
-    "id": { "type": "string", "minLength": 1 },
+    "schemaVersion": {
+      "const": "2.0"
+    },
+    "kind": {
+      "const": "pragma-design-context-package"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
     "issue": {
       "type": "object",
-      "required": ["provider", "repo", "number"],
+      "required": [
+        "provider",
+        "repo",
+        "number"
+      ],
       "properties": {
-        "provider": { "const": "gitea" },
-        "repo": { "type": "string", "minLength": 1 },
-        "number": { "type": "integer", "minimum": 1 },
-        "title": { "type": "string" },
+        "provider": {
+          "const": "gitea"
+        },
+        "repo": {
+          "type": "string",
+          "minLength": 1
+        },
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": {
+          "type": "string"
+        },
         "targetDevIssues": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["number"],
+            "required": [
+              "number"
+            ],
             "properties": {
-              "number": { "type": "integer", "minimum": 1 },
-              "title": { "type": "string" }
+              "number": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "title": {
+                "type": "string"
+              }
             },
             "additionalProperties": true
           }
@@ -33,45 +68,144 @@
     },
     "source": {
       "type": "object",
-      "required": ["provider", "adapter", "capturedAt"],
+      "required": [
+        "provider",
+        "adapter",
+        "capturedAt"
+      ],
       "properties": {
-        "provider": { "type": "string", "minLength": 1 },
-        "adapter": { "type": "string", "minLength": 1 },
-        "fileKey": { "type": "string" },
-        "nodes": { "type": "array", "items": { "type": "string" } },
-        "capturedAt": { "type": "string" },
-        "sourceChecksum": { "type": "string" }
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adapter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fileKey": {
+          "type": "string"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "capturedAt": {
+          "type": "string"
+        },
+        "sourceChecksum": {
+          "type": "string"
+        }
       },
       "additionalProperties": true
     },
     "entrypoints": {
       "type": "object",
-      "required": ["humanHandoff", "agentContext", "designContext", "assetsManifest", "assetsDir", "screenshots"],
+      "required": [
+        "humanHandoff",
+        "agentContext",
+        "designContext",
+        "pixelSpec",
+        "layers",
+        "tokens",
+        "components",
+        "dependencies",
+        "assetsManifest",
+        "renderInstructions",
+        "visualBaseline",
+        "assetsDir",
+        "screenshots"
+      ],
       "properties": {
-        "humanHandoff": { "type": "string" },
-        "lanhuUrl": { "type": "string" },
-        "agentContext": { "type": "string" },
-        "designContext": { "type": "string" },
-        "assetsManifest": { "type": "string" },
-        "assetsDir": { "type": "string" },
-        "screenshots": { "type": "string" }
+        "humanHandoff": {
+          "type": "string"
+        },
+        "lanhuUrl": {
+          "type": "string"
+        },
+        "agentContext": {
+          "type": "string"
+        },
+        "designContext": {
+          "type": "string"
+        },
+        "assetsManifest": {
+          "type": "string"
+        },
+        "assetsDir": {
+          "type": "string"
+        },
+        "screenshots": {
+          "type": "string"
+        },
+        "pixelSpec": {
+          "type": "string"
+        },
+        "layers": {
+          "type": "string"
+        },
+        "tokens": {
+          "type": "string"
+        },
+        "components": {
+          "type": "string"
+        },
+        "dependencies": {
+          "type": "string"
+        },
+        "renderInstructions": {
+          "type": "string"
+        },
+        "visualBaseline": {
+          "type": "string"
+        },
+        "sourceDesignContext": {
+          "type": "string"
+        }
       },
       "additionalProperties": true
     },
     "artifact": {
       "type": "object",
-      "required": ["storage"],
+      "required": [
+        "storage"
+      ],
       "properties": {
-        "storage": { "enum": ["repo", "gitea-generic-package"] },
-        "path": { "type": "string" },
-        "owner": { "type": "string" },
-        "packageName": { "type": "string" },
-        "packageVersion": { "type": "string" },
-        "fileName": { "type": "string" },
-        "downloadUrl": { "type": "string" },
-        "checksum": { "type": "string", "pattern": "^sha256:" },
-        "publishedAt": { "type": "string" },
-        "dryRun": { "type": "boolean" }
+        "storage": {
+          "enum": [
+            "repo",
+            "gitea-generic-package"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "packageName": {
+          "type": "string"
+        },
+        "packageVersion": {
+          "type": "string"
+        },
+        "fileName": {
+          "type": "string"
+        },
+        "downloadUrl": {
+          "type": "string"
+        },
+        "checksum": {
+          "type": "string",
+          "pattern": "^sha256:"
+        },
+        "publishedAt": {
+          "type": "string"
+        },
+        "dryRun": {
+          "type": "boolean"
+        }
       },
       "additionalProperties": true
     }

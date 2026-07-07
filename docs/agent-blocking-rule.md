@@ -10,3 +10,15 @@ Blocking message:
 ```
 
 `pragma design read --dev-issue-file <file> --repo <repo>` implements the local-file version of this rule. It parses the development issue markdown, finds the dependency, and stops with exit code `2` if the manifest is missing.
+
+Agent read order for an unblocked package:
+
+1. `manifest.json`
+2. `normalized/agent-context.md` for briefing and package map only
+3. `normalized/pixel-spec.json` as the primary pixel implementation spec
+4. `normalized/dependencies.json` for concrete shared components/assets snapshot locks
+5. `normalized/assets.json`, `tokens.json`, `components.json`, and `render-instructions.md`
+6. `source/figma-get-design-context.md` only as fallback/source evidence
+7. `screenshots/*` and `validation/visual-baseline.json` for visual comparison
+
+If `normalized/dependencies.json` reports `missing` for components while the page has component instances, or `missing` for assets while unresolved/shared asset refs exist, the Agent must stop and request a new Design Context Package instead of guessing from Figma names or screenshots.

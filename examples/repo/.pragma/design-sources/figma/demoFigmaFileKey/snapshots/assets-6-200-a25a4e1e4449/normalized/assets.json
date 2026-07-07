@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-design-assets",
+  "assets": [
+    {
+      "id": "asset-drone-icon",
+      "name": "Drone marker icon",
+      "role": "map-marker",
+      "type": "svg",
+      "mime": "image/svg+xml",
+      "path": "assets/icons/drone.svg",
+      "width": 32,
+      "height": 32,
+      "sourceNodeIds": [],
+      "bindings": [
+        {
+          "figmaNodeId": "1:40",
+          "fit": "contain",
+          "crop": null,
+          "placement": {
+            "x": 920,
+            "y": 520,
+            "width": 32,
+            "height": 32
+          }
+        }
+      ],
+      "checksum": "sha256:677b1766d6fec7113f6a7f39cc8c2f00500788c20623a6205ce24cfcb48b348d",
+      "required": true
+    },
+    {
+      "id": "asset-panel-bg",
+      "name": "Panel background placeholder",
+      "role": "panel-background",
+      "type": "png",
+      "mime": "image/png",
+      "path": "assets/images/panel-bg.png",
+      "width": 1,
+      "height": 1,
+      "sourceNodeIds": [],
+      "bindings": [
+        {
+          "figmaNodeId": "1:50",
+          "fit": "cover",
+          "crop": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1
+          },
+          "placement": {
+            "x": 1544,
+            "y": 96,
+            "width": 352,
+            "height": 880
+          }
+        }
+      ],
+      "checksum": "sha256:4b5c5c92cec3b23e6a294fc0eea43234ef5126c5a64f4c6c531ac8430ab0b844",
+      "required": false
+    }
+  ]
+}

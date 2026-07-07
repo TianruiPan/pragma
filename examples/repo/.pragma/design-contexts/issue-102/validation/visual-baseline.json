@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-visual-baseline",
+  "viewports": [
+    {
+      "id": "desktop-1920",
+      "width": 1920,
+      "height": 1080,
+      "deviceScale": 1,
+      "baselineScreenshot": "screenshots/main-frame.webp",
+      "diffThreshold": {
+        "pixelRatio": 0.02,
+        "ignoreRegions": [
+          "region-dynamic-1"
+        ],
+        "warnOnlyRegions": []
+      }
+    }
+  ],
+  "strategy": "screenshot-diff-for-reference",
+  "humanReviewRequired": true
+}

@@ -1,6 +1,7 @@
 import path from "node:path";
-import { pathExists, listFilesRecursive, relativePosix } from "./fs.js";
+import { pathExists, listFilesRecursive, normalizeRelativePosix, relativePosix, safeJoin } from "./fs.js";
 import { sha256File } from "./checksum.js";
+import { mimeForType, sniffAssetFile, typeFromExtension } from "./mime.js";
 
 export function slugify(value, fallback = "item") {
   const slug = String(value ?? "")
@@ -19,10 +20,30 @@ export function asArray(value) {
 
 export function detectAssetType(filePath, explicitType) {
   if (explicitType) return String(explicitType).replace(/^\./, "").toLowerCase();
-  return path.extname(filePath).replace(/^\./, "").toLowerCase() || "binary";
+  return typeFromExtension(filePath) || "binary";
 }
 
-export async function normalizeAssets(contextDir, inputManifest = undefined) {
+async function normalizeAssetMetadata({ contextDir, outputRel, asset, id }) {
+  const absolute = safeJoin(contextDir, outputRel);
+  const sniffed = await sniffAssetFile(absolute);
+  const explicitType = detectAssetType(outputRel, asset.type || asset.format);
+  const type = sniffed.type !== "binary" ? sniffed.type : explicitType;
+  return {
+    type,
+    mime: sniffed.mime || asset.mime || mimeForType(type),
+    width: asset.width ?? sniffed.width,
+    height: asset.height ?? sniffed.height,
+    checksum: asset.checksum || await sha256File(absolute),
+    detected: {
+      type: sniffed.type,
+      mime: sniffed.mime,
+      width: sniffed.width,
+      height: sniffed.height
+    }
+  };
+}
+
+export async function normalizeAssets(contextDir, inputManifest = undefined, assetBindings = []) {
   const assetsRoot = path.join(contextDir, "assets");
   const files = await listFilesRecursive(assetsRoot);
   const byRel = new Map(files.map((file) => [relativePosix(contextDir, file), file]));
@@ -37,7 +58,7 @@ export async function normalizeAssets(contextDir, inputManifest = undefined) {
         .map(String);
       let outputRel = undefined;
       for (const candidate of candidatePaths) {
-        const cleaned = candidate.replace(/\\/g, "/").replace(/^\.\//, "");
+        const cleaned = normalizeRelativePosix(candidate);
         const withAssets = cleaned.startsWith("assets/") ? cleaned : `assets/${cleaned}`;
         if (byRel.has(withAssets)) {
           outputRel = withAssets;
@@ -49,16 +70,29 @@ export async function normalizeAssets(contextDir, inputManifest = undefined) {
         }
       }
       if (!outputRel) continue;
-      const absolute = path.join(contextDir, outputRel);
+      const id = asset.id || `asset-${slugify(path.basename(outputRel, path.extname(outputRel)), String(index + 1))}`;
+      const metadata = await normalizeAssetMetadata({ contextDir, outputRel, asset, id });
       normalized.push({
-        id: asset.id || `asset-${slugify(path.basename(outputRel, path.extname(outputRel)), String(index + 1))}`,
+        id,
         name: asset.name || path.basename(outputRel),
         role: asset.role || "implementation-asset",
-        type: detectAssetType(outputRel, asset.type || asset.format),
+        type: metadata.type,
+        mime: metadata.mime,
         path: outputRel,
-        width: asset.width,
-        height: asset.height,
-        checksum: asset.checksum || await sha256File(absolute),
+        width: metadata.width,
+        height: metadata.height,
+        sourceNodeIds: asset.sourceNodeIds || asset.sourceNodeId ? asArray(asset.sourceNodeIds || asset.sourceNodeId) : [],
+        bindings: [
+          ...asArray(asset.bindings),
+          ...assetBindings.filter((binding) => binding.assetId === id)
+        ].map((binding) => ({
+          nodeId: binding.nodeId,
+          figmaNodeId: binding.figmaNodeId,
+          fit: binding.fit || "contain",
+          crop: binding.crop ?? null,
+          placement: binding.placement
+        })),
+        checksum: metadata.checksum,
         required: asset.required !== false
       });
     }
@@ -68,13 +102,26 @@ export async function normalizeAssets(contextDir, inputManifest = undefined) {
   const normalized = [];
   for (const [index, file] of files.entries()) {
     const rel = relativePosix(contextDir, file);
+    const id = `asset-${slugify(path.basename(file, path.extname(file)), String(index + 1))}`;
+    const metadata = await normalizeAssetMetadata({ contextDir, outputRel: rel, asset: {}, id });
     normalized.push({
-      id: `asset-${slugify(path.basename(file, path.extname(file)), String(index + 1))}`,
+      id,
       name: path.basename(file),
       role: "implementation-asset",
-      type: detectAssetType(file),
+      type: metadata.type,
+      mime: metadata.mime,
       path: rel,
-      checksum: await sha256File(file),
+      width: metadata.width,
+      height: metadata.height,
+      sourceNodeIds: [],
+      bindings: assetBindings.filter((binding) => binding.assetId === id).map((binding) => ({
+        nodeId: binding.nodeId,
+        figmaNodeId: binding.figmaNodeId,
+        fit: binding.fit || "contain",
+        crop: binding.crop ?? null,
+        placement: binding.placement
+      })),
+      checksum: metadata.checksum,
       required: true
     });
   }

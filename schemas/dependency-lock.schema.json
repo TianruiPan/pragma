@@ -1,0 +1,18 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pragma.local/schemas/pragma-2.0/dependency-lock.schema.json",
+  "title": "Pragma 2.0 Capture Dependency Lock",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "fileKey", "pageFrames", "components", "assets", "rules"],
+  "properties": {
+    "schemaVersion": { "const": "2.0" },
+    "kind": { "const": "pragma-dependency-lock" },
+    "fileKey": { "type": "string" },
+    "capturedAt": { "type": "string" },
+    "pageFrames": { "type": "array" },
+    "components": { "$ref": "dependencies.schema.json#/$defs/dependencyRole" },
+    "assets": { "$ref": "dependencies.schema.json#/$defs/dependencyRole" },
+    "rules": { "type": "object" }
+  },
+  "additionalProperties": true
+}

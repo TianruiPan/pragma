@@ -1,8 +1,10 @@
 export class CliError extends Error {
-  constructor(message, exitCode = 1) {
+  constructor(message, exitCode = 1, code = "PRAGMA_CLI_ERROR", details = undefined) {
     super(message);
     this.name = "CliError";
     this.exitCode = exitCode;
+    this.code = code;
+    this.details = details;
   }
 }
 

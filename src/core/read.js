@@ -92,6 +92,12 @@ export async function readDesignContext(options) {
   const agentContextPath = path.join(contextDir, manifest.entrypoints.agentContext);
   const designContextPath = path.join(contextDir, manifest.entrypoints.designContext);
   const assetsPath = path.join(contextDir, manifest.entrypoints.assetsManifest);
+  const pixelSpecPath = path.join(contextDir, manifest.entrypoints.pixelSpec);
+  const dependenciesPath = path.join(contextDir, manifest.entrypoints.dependencies);
+  const tokensPath = path.join(contextDir, manifest.entrypoints.tokens);
+  const componentsPath = path.join(contextDir, manifest.entrypoints.components);
+  const renderInstructionsPath = path.join(contextDir, manifest.entrypoints.renderInstructions);
+  const visualBaselinePath = path.join(contextDir, manifest.entrypoints.visualBaseline);
   const agentContext = await readText(agentContextPath);
   return {
     required: true,
@@ -100,6 +106,12 @@ export async function readDesignContext(options) {
     agentContextPath,
     designContextPath,
     assetsPath,
+    pixelSpecPath,
+    dependenciesPath,
+    tokensPath,
+    componentsPath,
+    renderInstructionsPath,
+    visualBaselinePath,
     manifest,
     agentContext
   };

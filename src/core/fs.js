@@ -84,11 +84,41 @@ export async function directorySizeBytes(rootDir, options = {}) {
 }
 
 export function toPosixPath(value) {
-  return value.split(path.sep).join("/");
+  return String(value).replace(/\\/g, "/").split(path.sep).join("/");
 }
 
 export function relativePosix(from, to) {
   return toPosixPath(path.relative(from, to));
+}
+
+export function normalizeRelativePosix(value) {
+  const normalized = toPosixPath(String(value || "")).replace(/^\.\/+/, "");
+  const parts = normalized.split("/").filter((part) => part && part !== ".");
+  if (parts.some((part) => part === "..")) {
+    throw new Error(`Unsafe relative path: ${value}`);
+  }
+  return parts.join("/");
+}
+
+export function isPathInside(parent, child) {
+  const relative = path.relative(path.resolve(parent), path.resolve(child));
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+export function safeJoin(root, ...parts) {
+  const target = path.resolve(root, ...parts);
+  if (!isPathInside(root, target)) {
+    throw new Error(`Refusing to access path outside root: ${target}`);
+  }
+  return target;
+}
+
+export function resolveRepoRootFromContext(contextDir) {
+  const resolved = path.resolve(contextDir);
+  const parts = resolved.split(path.sep);
+  const pragmaIndex = parts.map((part) => part.toLowerCase()).lastIndexOf(".pragma");
+  if (pragmaIndex <= 0) return undefined;
+  return parts.slice(0, pragmaIndex).join(path.sep) || path.parse(resolved).root;
 }
 
 export async function resetDirIfSafe(dir) {

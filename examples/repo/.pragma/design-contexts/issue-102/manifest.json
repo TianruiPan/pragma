@@ -23,14 +23,24 @@
       "1:23"
     ],
     "capturedAt": "2026-07-06T10:00:00+08:00",
-    "sourceChecksum": "sha256:f5dc9989fa0a7abcbf0d970fb48832ac4005dee90eb430200323e117ebc5d48c"
+    "sourceChecksum": "sha256:3045fee11710cfadb7807673f0f00d6514eed29f0303fb3e29349589eaeebc80",
+    "url": "https://www.figma.com/design/demoFigmaFileKey/Demo?node-id=1-23",
+    "originalNodeId": "1:23"
   },
   "entrypoints": {
     "humanHandoff": "handoff/README.md",
     "lanhuUrl": "https://lanhuapp.com/demo/project/map-monitoring",
     "agentContext": "normalized/agent-context.md",
     "designContext": "normalized/design-context.json",
+    "pixelSpec": "normalized/pixel-spec.json",
+    "layers": "normalized/layers.json",
+    "tokens": "normalized/tokens.json",
+    "components": "normalized/components.json",
+    "dependencies": "normalized/dependencies.json",
     "assetsManifest": "normalized/assets.json",
+    "renderInstructions": "normalized/render-instructions.md",
+    "visualBaseline": "validation/visual-baseline.json",
+    "sourceDesignContext": "source/figma-get-design-context.md",
     "assetsDir": "assets/",
     "screenshots": "screenshots/"
   },

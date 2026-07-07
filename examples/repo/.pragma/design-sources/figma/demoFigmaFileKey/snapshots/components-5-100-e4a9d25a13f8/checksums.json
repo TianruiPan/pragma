@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-design-checksums",
+  "algorithm": "sha256",
+  "generatedAt": "2026-07-07T08:13:11.541Z",
+  "files": [
+    {
+      "path": "capture.json",
+      "checksum": "sha256:60874d86f56c6772cb298326b49156f10be83558158c21250225e0c81ed68381"
+    },
+    {
+      "path": "normalized/components.json",
+      "checksum": "sha256:509817350d14e9ce571f0b023a62f00e4a99da53daf8b44638d90a30643e3938"
+    },
+    {
+      "path": "normalized/tokens.json",
+      "checksum": "sha256:9b9d971ee7a1230b85d87d7cc0ea6cb018c198841013dcddda25a718638bb4be"
+    },
+    {
+      "path": "screenshots/main-frame.webp",
+      "checksum": "sha256:fe748ff295da0aefd2d065b75d26ad634e71c8c5110852b043733378500b9198"
+    }
+  ]
+}

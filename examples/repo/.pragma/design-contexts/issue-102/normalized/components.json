@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-components",
+  "instances": [
+    {
+      "nodeId": "node-1-24",
+      "figmaNodeId": "1:24",
+      "name": "Top Filter Bar",
+      "componentSetId": "component-filter-bar",
+      "variant": {
+        "size": "default"
+      },
+      "bounds": {
+        "x": 24,
+        "y": 24,
+        "width": 760,
+        "height": 64
+      },
+      "optional": false,
+      "external": false
+    },
+    {
+      "nodeId": "node-1-50",
+      "figmaNodeId": "1:50",
+      "name": "Right Event Drawer",
+      "componentSetId": "component-warning-card",
+      "variant": {
+        "severity": "normal"
+      },
+      "bounds": {
+        "x": 1544,
+        "y": 96,
+        "width": 352,
+        "height": 880
+      },
+      "optional": false,
+      "external": false
+    }
+  ],
+  "componentSets": [
+    {
+      "id": "component-filter-bar",
+      "name": "FilterTab",
+      "source": "capture",
+      "variants": [
+        {
+          "name": "default"
+        },
+        {
+          "name": "active"
+        },
+        {
+          "name": "disabled"
+        }
+      ],
+      "states": [],
+      "optional": false,
+      "external": false
+    },
+    {
+      "id": "component-warning-card",
+      "name": "WarningCard",
+      "source": "capture",
+      "variants": [
+        {
+          "name": "normal"
+        },
+        {
+          "name": "critical"
+        }
+      ],
+      "states": [],
+      "optional": false,
+      "external": false
+    }
+  ],
+  "codeConnect": []
+}
