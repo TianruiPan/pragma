@@ -120,6 +120,17 @@ function flattenTree(input) {
   return nodes;
 }
 
+function figmaIdForNode(node, index) {
+  return String(node.figmaNodeId || node.nodeId || node.id || `generated:${index}`);
+}
+
+function childFigmaRefs(node) {
+  return asArray(node.children).map((child) => {
+    if (typeof child === "string") return child;
+    return String(child.figmaNodeId || child.nodeId || child.id || "");
+  }).filter(Boolean);
+}
+
 export function buildLayerModel(layerSource, selectionNodes) {
   const rawNodes = flattenTree(layerSource);
   const fallbackNodes = rawNodes.length ? rawNodes : selectionNodes.map((node) => ({
@@ -134,43 +145,141 @@ export function buildLayerModel(layerSource, selectionNodes) {
   const figmaToNormalized = new Map();
   const normalizedToFigma = new Map();
   fallbackNodes.forEach((node, index) => {
-    const figmaNodeId = node.figmaNodeId || node.nodeId || node.id || `generated:${index}`;
+    const figmaNodeId = figmaIdForNode(node, index);
     const normalizedId = normalizeNodeId(node.normalizedNodeId || node.normalizedId || figmaNodeId, `node-${index + 1}`);
     figmaToNormalized.set(String(figmaNodeId), normalizedId);
     normalizedToFigma.set(normalizedId, String(figmaNodeId));
   });
 
+  const parentByFigma = new Map();
+  fallbackNodes.forEach((node, index) => {
+    const parentFigmaId = figmaIdForNode(node, index);
+    for (const childRef of childFigmaRefs(node)) {
+      if (!parentByFigma.has(childRef)) parentByFigma.set(childRef, parentFigmaId);
+    }
+  });
+  const normalizedIds = new Set(figmaToNormalized.values());
+
   const layers = fallbackNodes.map((node, index) => {
-    const figmaNodeId = String(node.figmaNodeId || node.nodeId || node.id || `generated:${index}`);
-    const childRefs = asArray(node.children).map((child) => {
-      if (typeof child === "string") return child;
-      return String(child.figmaNodeId || child.nodeId || child.id || "");
-    }).filter(Boolean);
-    return {
+    const figmaNodeId = figmaIdForNode(node, index);
+    const childRefs = childFigmaRefs(node)
+      .map((childRef) => figmaToNormalized.get(childRef) || (normalizedIds.has(childRef) ? childRef : undefined))
+      .filter(Boolean);
+    const parentFigmaId = parentByFigma.get(figmaNodeId);
+    const parentId = parentFigmaId ? figmaToNormalized.get(parentFigmaId) : undefined;
+    const hidden = Boolean(node.hidden || node.visible === false);
+    const type = node.type || "FRAME";
+    const renderable = node.renderable ?? (!hidden && !["SECTION", "PAGE"].includes(String(type).toUpperCase()));
+    const layer = {
+      id: figmaToNormalized.get(figmaNodeId),
       figmaNodeId,
       normalizedNodeId: figmaToNormalized.get(figmaNodeId),
       name: node.name || figmaNodeId,
-      type: node.type || "FRAME",
-      bounds: normalizeBounds(node),
-      componentRef: node.componentRef || (node.componentId ? { componentId: node.componentId } : null),
-      children: childRefs
+      type,
+      parentId,
+      children: childRefs,
+      sourceOrder: Number.isFinite(Number(node.sourceOrder)) ? Number(node.sourceOrder) : index
     };
+    if (renderable === false) layer.renderable = false;
+    if (hidden) layer.hidden = true;
+    if (node.locked) layer.locked = true;
+    if (node.sectionId) layer.sectionId = node.sectionId;
+    if (node.role) layer.role = node.role;
+    return layer;
   });
 
-  const explicitRoots = asArray(layerSource?.rootNodeIds).map(String);
+  const explicitRoots = asArray(layerSource?.rootNodeIds)
+    .map(String)
+    .map((rootId) => figmaToNormalized.get(rootId) || (normalizedIds.has(rootId) ? rootId : undefined))
+    .filter(Boolean);
   const allChildren = new Set(layers.flatMap((node) => node.children || []));
-  const roots = explicitRoots.length ? explicitRoots : layers.map((node) => node.figmaNodeId).filter((id) => !allChildren.has(id));
+  const roots = explicitRoots.length ? explicitRoots : layers.map((node) => node.id).filter((id) => !allChildren.has(id));
 
   return {
     layers: {
       schemaVersion: "2.0",
       kind: "pragma-layer-tree",
-      rootNodeIds: roots.length ? roots : layers.slice(0, 1).map((node) => node.figmaNodeId),
+      rootNodeIds: roots.length ? roots : layers.slice(0, 1).map((node) => node.id),
       nodes: layers
     },
     rawNodes: fallbackNodes,
     figmaToNormalized,
     normalizedToFigma
+  };
+}
+
+function stableValue(value) {
+  if (value === null || value === undefined) return "";
+  if (typeof value !== "object") return String(value).trim().toLowerCase();
+  if (Array.isArray(value)) return `[${value.map(stableValue).join(",")}]`;
+  return `{${Object.keys(value).sort().map((key) => `${key}:${stableValue(value[key])}`).join(",")}}`;
+}
+
+function comparableTokenValue(value, type) {
+  if (value && typeof value === "object" && "resolvedValue" in value) return comparableTokenValue(value.resolvedValue, type);
+  if (type === "color" && typeof value === "string") return value.trim().toLowerCase();
+  if (type === "radius") {
+    if (typeof value === "number") return `uniform:${value}`;
+    if (value && typeof value === "object") {
+      const corners = [value.topLeft, value.topRight, value.bottomRight, value.bottomLeft].map(Number);
+      if (corners.every((corner) => Number.isFinite(corner)) && corners.every((corner) => corner === corners[0])) {
+        return `uniform:${corners[0]}`;
+      }
+    }
+  }
+  return stableValue(value);
+}
+
+function buildTokenLookup(tokens) {
+  const lookup = new Map();
+  for (const token of asArray(tokens?.tokens)) {
+    if (!token?.id || !token.type) continue;
+    const key = `${token.type}:${comparableTokenValue(token.value, token.type)}`;
+    if (!lookup.has(key)) lookup.set(key, token.id);
+  }
+  return lookup;
+}
+
+function mapTokenValue(value, type, tokenLookup) {
+  if (value === undefined || value === null) return undefined;
+  if (value && typeof value === "object" && "resolvedValue" in value) return value;
+  const tokenId = tokenLookup.get(`${type}:${comparableTokenValue(value, type)}`);
+  return tokenId ? { tokenId, resolvedValue: value } : { resolvedValue: value };
+}
+
+function normalizePaints(value, tokenLookup) {
+  return asArray(value).filter(Boolean).map((paint) => {
+    if (typeof paint === "string") {
+      return { type: "solid", color: mapTokenValue(paint, "color", tokenLookup) };
+    }
+    if (!paint || typeof paint !== "object") return paint;
+    const normalized = { ...paint };
+    const colorValue = paint.color ?? paint.value ?? paint.hex;
+    if (colorValue !== undefined) normalized.color = mapTokenValue(colorValue, "color", tokenLookup);
+    return normalized;
+  });
+}
+
+function normalizeShadows(value, tokenLookup) {
+  return asArray(value).filter(Boolean).map((shadow) => mapTokenValue(shadow, "shadow", tokenLookup));
+}
+
+function normalizeTextWithTokens(raw, tokenLookup) {
+  const text = normalizeText(raw);
+  if (!text) return null;
+  const typographyValue = {
+    fontFamily: text.fontFamily,
+    fontWeight: text.fontWeight,
+    fontSize: text.fontSize,
+    lineHeight: text.lineHeight,
+    letterSpacing: text.letterSpacing
+  };
+  return {
+    ...text,
+    color: text.color !== undefined ? mapTokenValue(text.color, "color", tokenLookup) : undefined,
+    typography: Object.values(typographyValue).some((item) => item !== undefined)
+      ? mapTokenValue(typographyValue, "typography", tokenLookup)
+      : undefined
   };
 }
 
@@ -198,40 +307,39 @@ function bindingForNode(bindings, pixelNode) {
   return bindings.find((binding) => binding.nodeId === pixelNode.id || binding.figmaNodeId === pixelNode.figmaNodeId) || null;
 }
 
-export function buildPixelSpec({ contextId, rawNodes, layers, figmaToNormalized, assetBindings, dynamicRegionNotes }) {
+export function buildPixelSpec({ contextId, rawNodes, layers, figmaToNormalized, assetBindings, dynamicRegionNotes, tokens }) {
+  const tokenLookup = buildTokenLookup(tokens);
   const pixelNodes = rawNodes.map((node, index) => {
-    const figmaNodeId = String(node.figmaNodeId || node.nodeId || node.id || `generated:${index}`);
+    const figmaNodeId = figmaIdForNode(node, index);
     const normalizedId = figmaToNormalized.get(figmaNodeId) || normalizeNodeId(figmaNodeId, `node-${index + 1}`);
-    const childRefs = asArray(node.children).map((child) => {
-      const childFigmaId = typeof child === "string" ? child : String(child.figmaNodeId || child.nodeId || child.id || "");
-      return figmaToNormalized.get(childFigmaId);
-    }).filter(Boolean);
+    const radius = normalizeRadius(node);
     const pixelNode = {
       id: normalizedId,
       figmaNodeId,
+      layerRef: normalizedId,
       name: node.name || figmaNodeId,
       type: normalizeNodeType(node.type),
       zIndex: Number.isFinite(Number(node.zIndex)) ? Number(node.zIndex) : index,
       bounds: normalizeBounds(node),
       layout: normalizeLayout(node),
-      fills: asArray(node.fills || node.fill).filter(Boolean),
-      strokes: asArray(node.strokes || node.stroke).filter(Boolean),
-      radius: normalizeRadius(node),
-      shadow: asArray(node.shadow || node.shadows || node.effects).filter(Boolean),
+      fills: normalizePaints(node.fills || node.fill, tokenLookup),
+      strokes: normalizePaints(node.strokes || node.stroke, tokenLookup),
+      radius: radius ? mapTokenValue(radius, "radius", tokenLookup) : null,
+      shadow: normalizeShadows(node.shadow || node.shadows || node.effects, tokenLookup),
       opacity: node.opacity ?? 1,
       blendMode: node.blendMode || "normal",
-      text: normalizeText(node),
+      text: normalizeTextWithTokens(node, tokenLookup),
       assetBinding: null,
       componentRef: node.componentRef || (node.componentId ? { componentId: node.componentId, variant: node.variant } : null),
-      state: node.state || "default",
-      children: childRefs
+      state: node.state || "default"
     };
     pixelNode.assetBinding = bindingForNode(assetBindings, pixelNode);
     return pixelNode;
   });
 
-  const rootLayer = layers.nodes.find((node) => layers.rootNodeIds.includes(node.figmaNodeId)) || layers.nodes[0];
-  const viewportBounds = rootLayer?.bounds || pixelNodes[0]?.bounds || { width: 0, height: 0 };
+  const rootIds = new Set(asArray(layers.rootNodeIds));
+  const rootPixelNode = pixelNodes.find((node) => rootIds.has(node.id) || rootIds.has(node.figmaNodeId)) || pixelNodes[0];
+  const viewportBounds = rootPixelNode?.bounds || { width: 0, height: 0 };
   const mapLikeNodeIds = pixelNodes
     .filter((node) => /map|地图|chart|图表|video|视频|3d|三维|realtime|实时/i.test(`${node.name} ${node.type}`))
     .map((node) => node.id);
@@ -255,7 +363,6 @@ export function buildPixelSpec({ contextId, rawNodes, layers, figmaToNormalized,
       deviceScale: 1
     },
     nodes: pixelNodes,
-    assetBindings,
     states: [
       { name: "default", nodeIds: pixelNodes.filter((node) => node.state === "default").map((node) => node.id) },
       { name: "loading", nodeIds: pixelNodes.filter((node) => node.state === "loading").map((node) => node.id) },
@@ -298,7 +405,7 @@ export function buildTokens(variablesSource) {
   };
 }
 
-export function buildComponents(componentsSource, rawNodes = []) {
+export function buildComponents(componentsSource, rawNodes = [], figmaToNormalized = new Map()) {
   const rawComponentSets = asArray(componentsSource?.componentSets || componentsSource?.components || componentsSource);
   const componentSets = rawComponentSets.filter((component) => component && typeof component === "object").map((component) => {
     const id = component.id || component.componentSetId || component.componentId || `component-${slugify(component.name || component.key || "component")}`;
@@ -323,15 +430,17 @@ export function buildComponents(componentsSource, rawNodes = []) {
     const componentRef = node.componentRef || (node.componentId ? { componentId: node.componentId, variant: node.variant } : undefined);
     const componentId = componentRef?.componentId || componentRef?.id || componentRef?.componentSetId;
     if (!componentId) continue;
-    const figmaNodeId = String(node.figmaNodeId || node.nodeId || node.id || `generated:${index}`);
+    const figmaNodeId = figmaIdForNode(node, index);
+    const normalizedId = figmaToNormalized.get(figmaNodeId) || normalizeNodeId(node.normalizedNodeId || node.normalizedId || figmaNodeId, `component-instance-${index + 1}`);
     instances.push({
-      nodeId: normalizeNodeId(node.normalizedNodeId || node.normalizedId || figmaNodeId, `component-instance-${index + 1}`),
+      nodeId: normalizedId,
+      pixelNodeId: normalizedId,
+      layerRef: normalizedId,
       figmaNodeId,
       name: node.name || componentRef.name || componentId,
       mainComponentNodeId: componentRef.mainComponentNodeId || componentRef.mainNodeId || componentRef.nodeId,
       componentSetId: componentId,
       variant: componentRef.variant && typeof componentRef.variant === "object" ? componentRef.variant : (componentRef.variant ? { name: componentRef.variant } : undefined),
-      bounds: normalizeBounds(node),
       optional: componentRef.optional === true,
       external: componentRef.external === true,
       definitionSource: componentRef.definitionSource

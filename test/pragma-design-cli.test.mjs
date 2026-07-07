@@ -70,7 +70,7 @@ async function createInputFixture(root) {
   await writeJson(path.join(input, "figma", "layers.json"), {
     rootNodeIds: ["1:23"],
     nodes: [
-      { figmaNodeId: "1:23", name: "Main", type: "FRAME", bounds: { x: 0, y: 0, width: 1440, height: 900 }, children: ["1:24", "1:30"] },
+      { figmaNodeId: "1:23", name: "Main", type: "FRAME", bounds: { x: 0, y: 0, width: 1440, height: 900 }, fills: ["#ffffff"], radius: 4, children: ["1:24", "1:30"] },
       { figmaNodeId: "1:24", name: "Title", type: "TEXT", bounds: { x: 24, y: 24, width: 160, height: 32 }, text: { content: "Dashboard", fontSize: 24, lineHeight: 32, color: "#ffffff" } },
       { figmaNodeId: "1:30", name: "Drone icon", type: "IMAGE", bounds: { x: 200, y: 200, width: 32, height: 32 } }
     ]
@@ -78,7 +78,7 @@ async function createInputFixture(root) {
   await writeJson(path.join(input, "asset-bindings.json"), {
     bindings: [{ assetId: "asset-drone-icon", figmaNodeId: "1:30", fit: "contain", placement: { x: 200, y: 200, width: 32, height: 32 } }]
   });
-  await writeJson(path.join(input, "figma", "variables.json"), { colors: { "text.primary": "#ffffff" } });
+  await writeJson(path.join(input, "figma", "variables.json"), { colors: { "text.primary": "#ffffff" }, radius: { "radius.sm": 4 } });
   await writeJson(path.join(input, "figma", "components.json"), { components: [] });
   await fs.writeFile(path.join(input, "figma", "get-design-context.md"), "# Raw context\n", "utf8");
   await fs.mkdir(path.join(input, "assets", "icons"), { recursive: true });
@@ -89,6 +89,14 @@ async function createInputFixture(root) {
   await fs.writeFile(path.join(input, "designer-notes.md"), "Design intent note.\n", "utf8");
   await fs.writeFile(path.join(input, "dynamic-regions.md"), "Map is implementation-defined.\n", "utf8");
   return { input, repo };
+}
+
+async function copyIncomingCapture(input, repo, issue, timestamp) {
+  const target = path.join(repo, ".pragma", "incoming", "figma-captures", `issue-${issue}-${timestamp}`, "pragma-input");
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  await fs.rm(target, { recursive: true, force: true });
+  await fs.cp(input, target, { recursive: true });
+  return target;
 }
 
 test("ingest, validate, issue-fragment, read, and asset lookup work", async () => {
@@ -114,6 +122,19 @@ test("ingest, validate, issue-fragment, read, and asset lookup work", async () =
   const pixelSpec = JSON.parse(await fs.readFile(path.join(contextDir, "normalized", "pixel-spec.json"), "utf8"));
   assert.equal(pixelSpec.kind, "pragma-pixel-spec");
   assert.equal(pixelSpec.nodes.some((node) => node.assetBinding?.assetId === "asset-drone-icon"), true);
+  assert.equal(pixelSpec.nodes.every((node) => node.layerRef && (!node.children || node.children.length === 0)), true);
+  const titleNode = pixelSpec.nodes.find((node) => node.figmaNodeId === "1:24");
+  assert.equal(titleNode.text.color.tokenId, "color-text-primary");
+  assert.equal(titleNode.text.color.resolvedValue, "#ffffff");
+  const mainNode = pixelSpec.nodes.find((node) => node.figmaNodeId === "1:23");
+  assert.equal(mainNode.radius.tokenId, "radius-radius-sm");
+  assert.deepEqual(mainNode.radius.resolvedValue, { topLeft: 4, topRight: 4, bottomRight: 4, bottomLeft: 4 });
+  assert.equal(mainNode.fills[0].color.tokenId, "color-text-primary");
+  const layers = JSON.parse(await fs.readFile(path.join(contextDir, "normalized", "layers.json"), "utf8"));
+  assert.equal(layers.nodes.every((node) => !("bounds" in node) && !("componentRef" in node) && !("text" in node) && !("assetBinding" in node)), true);
+  const assets = JSON.parse(await fs.readFile(path.join(contextDir, "normalized", "assets.json"), "utf8"));
+  assert.equal(assets.assets.every((assetItem) => !("bindings" in assetItem) && !("fit" in assetItem) && !("crop" in assetItem) && !("placement" in assetItem)), true);
+  assert.deepEqual(assets.assets[0].usedByNodeIds, ["node-1-30"]);
   const visualBaseline = JSON.parse(await fs.readFile(path.join(contextDir, "validation", "visual-baseline.json"), "utf8"));
   assert.equal(visualBaseline.kind, "pragma-visual-baseline");
 
@@ -126,6 +147,78 @@ test("Figma URL parser normalizes node-id hyphens to colons", () => {
   const parsed = parseFigmaUrl("https://www.figma.com/design/fileKey/Demo?node-id=1239-6203");
   assert.equal(parsed.fileKey, "fileKey");
   assert.equal(parsed.nodeId, "1239:6203");
+});
+
+test("validate enforces normalized canonical ownership and token mapping", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-canonical-"));
+  const { input, repo } = await createInputFixture(tmp);
+  await run(["design", "ingest", "--input", input, "--repo", repo]);
+  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102");
+
+  const layersPath = path.join(contextDir, "normalized", "layers.json");
+  const layers = await readJson(layersPath);
+  layers.nodes[0].bounds = { x: 0, y: 0, width: 1, height: 1 };
+  await writeJson(layersPath, layers);
+
+  const pixelPath = path.join(contextDir, "normalized", "pixel-spec.json");
+  const pixelSpec = await readJson(pixelPath);
+  pixelSpec.nodes.find((node) => node.figmaNodeId === "1:24").text.color = { tokenId: "color-text-primary" };
+  await writeJson(pixelPath, pixelSpec);
+
+  const assetsPath = path.join(contextDir, "normalized", "assets.json");
+  const assets = await readJson(assetsPath);
+  assets.assets[0].placement = { x: 0, y: 0, width: 32, height: 32 };
+  await writeJson(assetsPath, assets);
+
+  const componentsPath = path.join(contextDir, "normalized", "components.json");
+  const components = await readJson(componentsPath);
+  components.instances.push({ nodeId: "node-1-24", figmaNodeId: "1:24", bounds: { x: 0, y: 0, width: 1, height: 1 } });
+  await writeJson(componentsPath, components);
+
+  await assert.rejects(
+    run(["design", "validate", "--context", contextDir, "--json"]),
+    (error) => {
+      assert.equal(error.code, 1);
+      const result = JSON.parse(error.stdout);
+      assert.equal(result.issues.some((issue) => issue.code === "NORMALIZED_CANONICAL_OWNERSHIP" && issue.field === "bounds"), true);
+      assert.equal(result.issues.some((issue) => issue.code === "NORMALIZED_CANONICAL_OWNERSHIP" && issue.field === "placement"), true);
+      assert.equal(result.issues.some((issue) => issue.code === "TOKEN_MAPPING_MISSING_RESOLVED_VALUE"), true);
+      return true;
+    }
+  );
+});
+
+test("ingest prunes frame render assets and validate rejects them under assets", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-frame-render-"));
+  const { input, repo } = await createInputFixture(tmp);
+  await writeFakePng(path.join(input, "assets", "images", "homepage-render.png"), 1440, 900);
+  const manifest = await readJson(path.join(input, "assets-manifest.json"));
+  manifest.assets.push({
+    id: "asset-homepage-render",
+    name: "Homepage render",
+    role: "render-reference",
+    type: "png",
+    path: "images/homepage-render.png",
+    required: false
+  });
+  await writeJson(path.join(input, "assets-manifest.json"), manifest);
+
+  await run(["design", "ingest", "--input", input, "--repo", repo]);
+  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102");
+  await assert.rejects(fs.access(path.join(contextDir, "assets", "images", "homepage-render.png")));
+  const assets = await readJson(path.join(contextDir, "normalized", "assets.json"));
+  assert.equal(assets.assets.some((asset) => asset.id === "asset-homepage-render"), false);
+
+  await writeFakePng(path.join(contextDir, "assets", "images", "frame-render.png"), 1440, 900);
+  await assert.rejects(
+    run(["design", "validate", "--context", contextDir, "--json"]),
+    (error) => {
+      assert.equal(error.code, 1);
+      const result = JSON.parse(error.stdout);
+      assert.equal(result.issues.some((issue) => issue.code === "ASSET_FRAME_RENDER_IN_ASSETS"), true);
+      return true;
+    }
+  );
 });
 
 test("prepare-figma-capture reports selected, reused, missing, and none dependency states", async () => {
@@ -370,7 +463,7 @@ test("read blocks design/context development issue when dependent context is mis
   );
 });
 
-test("pack creates context.zip and publish supports repo mode", async () => {
+test("pack writes zip outside context and publish keeps repo mode zip-free", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-pack-"));
   const { input, repo } = await createInputFixture(tmp);
   await run(["design", "ingest", "--input", input, "--repo", repo]);
@@ -379,10 +472,24 @@ test("pack creates context.zip and publish supports repo mode", async () => {
   const packResult = JSON.parse(pack.stdout);
   assert.equal(packResult.ok, true);
   assert.match(packResult.checksum, /^sha256:/);
+  assert.notEqual(path.dirname(packResult.zipPath), contextDir);
+  await fs.access(packResult.zipPath);
+  await assert.rejects(fs.access(path.join(contextDir, "context.zip")));
 
   const publish = await run(["design", "publish", "--context", contextDir, "--threshold-mb", "20"]);
   const publishResult = JSON.parse(publish.stdout);
   assert.equal(publishResult.mode, "repo");
+  await assert.rejects(fs.access(path.join(contextDir, "context.zip")));
+
+  await fs.writeFile(path.join(contextDir, "context.zip"), "stale zip\n", "utf8");
+  await assert.rejects(
+    run(["design", "validate", "--context", contextDir]),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /context\.zip must not be present/);
+      return true;
+    }
+  );
 });
 
 test("publish supports Gitea Generic Package Registry dry run", async () => {
@@ -411,6 +518,16 @@ test("publish supports Gitea Generic Package Registry dry run", async () => {
 
   const validate = await run(["design", "validate", "--context", contextDir]);
   assert.match(validate.stdout, /OK:/);
+
+  await fs.writeFile(path.join(contextDir, "context.zip"), "bad zip\n", "utf8");
+  await assert.rejects(
+    run(["design", "validate", "--context", contextDir]),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /context\.zip checksum does not match/);
+      return true;
+    }
+  );
 });
 
 test("pack-from-figma-capture runs the full deterministic pipeline", async () => {
@@ -435,6 +552,71 @@ test("pack-from-figma-capture runs the full deterministic pipeline", async () =>
   assert.equal(summary.readSmokeCheck.ok, true);
   await fs.access(path.join(packedResult.contextDir, "normalized", "pixel-spec.json"));
   await fs.access(path.join(packedResult.contextDir, "validation", "visual-baseline.json"));
+  await assert.rejects(fs.access(path.join(packedResult.contextDir, "context.zip")));
+});
+
+test("pack-latest-capture resolves latest repo-scoped capture and supports explicit input", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-latest-"));
+  const fixtureRoot = path.join(tmp, "中文路径");
+  const { input, repo } = await createInputFixture(fixtureRoot);
+  const older = await copyIncomingCapture(input, repo, 102, "20260707T010000");
+  const latest = await copyIncomingCapture(input, repo, 102, "20260707T020000");
+  const latestLayersPath = path.join(latest, "figma", "layers.json");
+  const latestLayers = await readJson(latestLayersPath);
+  latestLayers.nodes[0].name = "主页";
+  await writeJson(latestLayersPath, latestLayers);
+
+  const outsideRepo = path.join(tmp, "outside-repo");
+  await fs.mkdir(outsideRepo, { recursive: true });
+  await copyIncomingCapture(input, outsideRepo, 102, "20990101T000000");
+
+  const resolved = JSON.parse((await run(["design", "pack-latest-capture", "--repo", repo, "--issue", "102", "--preflight-only", "--json"])).stdout);
+  assert.equal(resolved.ok, true);
+  assert.equal(path.resolve(resolved.inputPath), path.resolve(latest));
+  assert.equal(resolved.latestCapture.selectedCaptureName, "issue-102-20260707T020000");
+  assert.equal(resolved.inputPath.includes("outside-repo"), false);
+  await assert.rejects(fs.access(path.join(repo, ".pragma", "design-contexts", "issue-102")));
+
+  const explicit = JSON.parse((await run(["design", "pack-latest-capture", "--repo", repo, "--issue", "102", "--input", older, "--preflight-only", "--json"])).stdout);
+  assert.equal(explicit.ok, true);
+  assert.equal(path.resolve(explicit.inputPath), path.resolve(older));
+  assert.equal(explicit.inputSource, "explicit");
+});
+
+test("pack-latest-capture protects existing context and force reruns", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-latest-full-"));
+  const { input, repo } = await createInputFixture(tmp);
+  await copyIncomingCapture(input, repo, 102, "20260707T030000");
+
+  const first = JSON.parse((await run(["design", "pack-latest-capture", "--repo", repo, "--issue", "102", "--json"])).stdout);
+  assert.equal(first.ok, true);
+  assert.equal(first.command, "design pack-latest-capture");
+  assert.equal(first.mode, "full");
+  assert.equal(typeof first.timings.resolveInputMs, "number");
+  assert.equal(first.validation.ok, true);
+  assert.equal(first.readSmokeCheck.ok, true);
+  await fs.access(first.summaryPath);
+  await assert.rejects(fs.access(path.join(first.contextDir, "context.zip")));
+  const summary = await readJson(first.summaryPath);
+  assert.equal(summary.command, "design pack-latest-capture");
+  assert.equal(summary.latestCapture.selectedCaptureName, "issue-102-20260707T030000");
+  assert.equal(summary.validation.ok, true);
+
+  await assert.rejects(
+    run(["design", "pack-latest-capture", "--repo", repo, "--issue", "102", "--json"]),
+    (error) => {
+      assert.equal(error.code, 2);
+      const result = JSON.parse(error.stderr);
+      assert.equal(result.code, "PRAGMA_CONTEXT_EXISTS");
+      assert.match(result.message, /Context already exists/);
+      return true;
+    }
+  );
+
+  const forced = JSON.parse((await run(["design", "pack-latest-capture", "--repo", repo, "--issue", "102", "--force", "--json"])).stdout);
+  assert.equal(forced.ok, true);
+  assert.equal(forced.contextDir, first.contextDir);
+  assert.equal(forced.readSmokeCheck.ok, true);
 });
 
 test("from-figma returns timings and updates pipeline summary", async () => {
@@ -504,6 +686,18 @@ test("ingest and pack-from-figma-capture preserve dependency-lock as normalized 
   assert.equal(deps.pageFrames[0].snapshotId, "page-1-23-fixed");
 });
 
+test("pack-from-figma-capture creates a default dependency lock for legacy capture input", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-legacy-lock-"));
+  const { input, repo } = await createInputFixture(tmp);
+  await fs.rm(path.join(input, "dependency-lock.json"), { force: true });
+  const packedResult = JSON.parse((await run(["design", "pack-from-figma-capture", "--input", input, "--repo", repo, "--threshold-mb", "20"])).stdout);
+  assert.equal(packedResult.ok, true);
+  assert.equal(packedResult.preflight.repairs.some((repair) => repair.code === "DEPENDENCY_LOCK_CREATED"), true);
+  const deps = await readJson(path.join(packedResult.contextDir, "normalized", "dependencies.json"));
+  assert.equal(deps.components.status, "none");
+  assert.equal(deps.pageFrames[0].snapshotId, "page-1-23-capture");
+});
+
 test("validate --context checks locked dependency snapshots are recoverable from repo registry", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-context-registry-"));
   const { input, repo } = await createInputFixture(tmp);
@@ -555,7 +749,7 @@ test("validate rejects broken pixel spec asset references", async () => {
   const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102");
   const pixelSpecPath = path.join(contextDir, "normalized", "pixel-spec.json");
   const pixelSpec = JSON.parse(await fs.readFile(pixelSpecPath, "utf8"));
-  pixelSpec.assetBindings[0].assetId = "asset-missing";
+  pixelSpec.nodes.find((node) => node.assetBinding?.assetId === "asset-drone-icon").assetBinding.assetId = "asset-missing";
   await fs.writeFile(pixelSpecPath, `${JSON.stringify(pixelSpec, null, 2)}\n`, "utf8");
   await assert.rejects(
     run(["design", "validate", "--context", contextDir]),

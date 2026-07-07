@@ -14,7 +14,7 @@ import {
 import { generateChecksums, sha256Text } from "./checksum.js";
 import { buildDependencies } from "./dependencies.js";
 import { parseFigmaUrl } from "./figma-url.js";
-import { extractSelectionNodes, listContextFiles, normalizeAssets, slugify } from "./normalize.js";
+import { extractSelectionNodes, listContextFiles, normalizeAssets, pruneUnreferencedAssetFiles, slugify } from "./normalize.js";
 import {
   buildComponents,
   buildLayerModel,
@@ -188,17 +188,21 @@ export async function ingestDesignContext(options) {
 
   const layerModel = buildLayerModel(layerSource, selectionNodes);
   const assetBindings = normalizeAssetBindings(assetBindingsSource, layerModel.figmaToNormalized);
+  const tokens = buildTokens(variablesSource);
   const assets = await normalizeAssets(contextDir, inputAssetManifest, assetBindings);
+  await pruneUnreferencedAssetFiles(contextDir, assets);
+  const implementationAssetIds = new Set(assets.map((asset) => asset.id));
+  const implementationAssetBindings = assetBindings.filter((binding) => implementationAssetIds.has(binding.assetId));
   const pixelSpec = buildPixelSpec({
     contextId,
     rawNodes: layerModel.rawNodes,
     layers: layerModel.layers,
     figmaToNormalized: layerModel.figmaToNormalized,
-    assetBindings,
-    dynamicRegionNotes
+    assetBindings: implementationAssetBindings,
+    dynamicRegionNotes,
+    tokens
   });
-  const tokens = buildTokens(variablesSource);
-  const components = buildComponents(componentsSource, layerModel.rawNodes);
+  const components = buildComponents(componentsSource, layerModel.rawNodes, layerModel.figmaToNormalized);
   const visualBaseline = buildVisualBaseline(pixelSpec, screenshots);
   const dependencies = buildDependencies({ dependencyLock, capture, selectionNodes });
 

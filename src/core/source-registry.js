@@ -4,7 +4,7 @@ import { CliError } from "./errors.js";
 import { generateChecksums, sha256File, sha256Text } from "./checksum.js";
 import { parseFigmaUrl, figmaNodeIdForPath, normalizeFigmaNodeId } from "./figma-url.js";
 import { ensureDir, listFilesRecursive, pathExists, readJson, relativePosix, safeJoin, writeJson } from "./fs.js";
-import { asArray, normalizeAssets } from "./normalize.js";
+import { asArray, normalizeAssets, pruneUnreferencedAssetFiles } from "./normalize.js";
 import { buildComponents, buildLayerModel, buildTokens } from "./pixel-normalize.js";
 
 const ROLES = new Set(["components", "assets"]);
@@ -171,7 +171,7 @@ async function buildComponentsSnapshot(inputDir) {
   const componentsSource = await readJson(path.join(inputDir, "figma", "components.json"), {}).catch(() => ({}));
   const layerModel = buildLayerModel(layerSource, []);
   return {
-    components: buildComponents(componentsSource, layerModel.rawNodes),
+    components: buildComponents(componentsSource, layerModel.rawNodes, layerModel.figmaToNormalized),
     tokens: buildTokens(variablesSource)
   };
 }
@@ -208,6 +208,7 @@ async function materializeSnapshot({ role, inputDir, snapshotDir }) {
     const bindings = await readJson(path.join(inputDir, "asset-bindings.json"), {}).catch(() => ({}));
     const assetsManifest = await readJson(path.join(inputDir, "assets-manifest.json"), undefined).catch(() => undefined);
     const assets = await normalizeAssets(snapshotDir, assetsManifest, asArray(bindings.bindings || bindings.assetBindings || bindings));
+    await pruneUnreferencedAssetFiles(snapshotDir, assets);
     await writeJson(path.join(snapshotDir, "normalized", "assets.json"), { schemaVersion: "2.0", kind: "pragma-design-assets", assets });
   }
   await generateChecksums(snapshotDir);

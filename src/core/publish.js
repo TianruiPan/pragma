@@ -40,6 +40,7 @@ async function uploadToGitea({ zipPath, downloadUrl, token }) {
 
 export async function publishDesignContext(options) {
   const contextDir = path.resolve(String(options.context));
+  await fs.rm(path.join(contextDir, "context.zip"), { force: true });
   await assertValidDesignContext({ context: contextDir });
   const thresholdMb = Number(options["threshold-mb"] || options.thresholdMb || 20);
   const maxMb = Number(options["max-mb"] || options.maxMb || 100);

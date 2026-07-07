@@ -47,10 +47,17 @@ async function createZipFromStaging(stagingDir, zipPath) {
   await run("zip", ["-r", zipPath, "."], { cwd: stagingDir });
 }
 
+async function defaultZipPath() {
+  const artifactDir = await fs.mkdtemp(path.join(os.tmpdir(), "pragma-context-zip-"));
+  return path.join(artifactDir, "context.zip");
+}
+
 export async function packDesignContext(options) {
   const contextDir = path.resolve(String(options.context));
+  const requestedZip = options.zip ? String(options.zip) : await defaultZipPath();
+  const zipPath = path.resolve(requestedZip);
+  await fs.rm(path.join(contextDir, "context.zip"), { force: true });
   await assertValidDesignContext({ context: contextDir });
-  const zipPath = path.resolve(String(options.zip || path.join(contextDir, "context.zip")));
   const stagingDir = await fs.mkdtemp(path.join(os.tmpdir(), "pragma-pack-"));
   try {
     await copyContextForZip(contextDir, stagingDir, zipPath);

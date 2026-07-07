@@ -399,6 +399,49 @@ function preflightFigmaConsistency({ capture, metadata, selection, lock, report 
   }
 }
 
+function createDefaultDependencyLock({ capture, metadata, selection }) {
+  const fileKey = capture?.figma?.fileKey || metadata?.fileKey || selection?.fileKey;
+  const pageNodeIds = [
+    ...asArray(capture?.figma?.nodeIds),
+    ...asArray(selection?.nodes).map((node) => node?.id || node?.nodeId || node?.figmaNodeId || node),
+    ...asArray(selection?.frames?.page).map((frame) => frame?.nodeId || frame?.id || frame)
+  ].map((nodeId) => normalizeFigmaNodeId(nodeId)).filter(Boolean);
+  const uniquePageNodeIds = [...new Set(pageNodeIds)];
+  return {
+    schemaVersion: "2.0",
+    kind: "pragma-dependency-lock",
+    fileKey,
+    capturedAt: capture?.capturedAt || new Date().toISOString(),
+    pageFrames: uniquePageNodeIds.map((nodeId) => ({
+      nodeId,
+      snapshotId: `page-${nodeId.replace(/:/g, "-")}-capture`
+    })),
+    components: { status: "none" },
+    assets: { status: "none" },
+    rules: {
+      lockDependencies: true,
+      neverDependOnFloatingLatest: true,
+      ifMissingComponentsAndPageHasInstances: "block",
+      ifMissingAssetsAndPageHasUnresolvedRefs: "block"
+    }
+  };
+}
+
+async function repairMissingDependencyLock(inputDir, json, report, fix) {
+  if (json["dependency-lock.json"] || !fix) return false;
+  const missing = report.issues.find((item) => item.code === "MISSING_REQUIRED_JSON" && item.path === "dependency-lock.json");
+  if (!missing) return false;
+  const lock = createDefaultDependencyLock({
+    capture: json["capture.json"],
+    metadata: json["figma/metadata.json"],
+    selection: json["figma/selection.json"]
+  });
+  await writeJson(path.join(inputDir, "dependency-lock.json"), lock);
+  json["dependency-lock.json"] = lock;
+  markFixed(report, missing, "DEPENDENCY_LOCK_CREATED", "Created default dependency-lock.json for legacy capture input.", { path: "dependency-lock.json" });
+  return true;
+}
+
 function finalize(report) {
   const unresolved = report.issues.filter((item) => !item.fixed && (item.category === "AUTO_FIXABLE" || item.category === "BLOCKING_INPUT" || item.category === "BLOCKING_DESIGN"));
   report.ok = unresolved.length === 0;
@@ -444,6 +487,7 @@ export async function preflightFigmaCapture(options) {
   for (const rel of REQUIRED_JSON) {
     json[rel] = await readJsonForPreflight(inputDir, rel, report, fix);
   }
+  await repairMissingDependencyLock(inputDir, json, report, fix);
 
   await preflightAssets(inputDir, json["assets-manifest.json"], report, fix);
   await preflightDependencies({

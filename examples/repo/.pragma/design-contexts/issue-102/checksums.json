@@ -2,7 +2,7 @@
   "schemaVersion": "2.0",
   "kind": "pragma-design-checksums",
   "algorithm": "sha256",
-  "generatedAt": "2026-07-07T08:13:14.678Z",
+  "generatedAt": "2026-07-07T10:31:45.325Z",
   "files": [
     {
       "path": "assets/icons/drone.svg",
@@ -13,16 +13,12 @@
       "checksum": "sha256:4b5c5c92cec3b23e6a294fc0eea43234ef5126c5a64f4c6c531ac8430ab0b844"
     },
     {
-      "path": "context.zip",
-      "checksum": "sha256:a3ffb326cea7d424ec4cc9d6f92c286ca88c0ef10c5deda25f7215a89f92aa5a"
-    },
-    {
       "path": "handoff/README.md",
       "checksum": "sha256:498322a543de592734fec82d30d0a125c9bec71530412a105120d976d877cbb9"
     },
     {
       "path": "manifest.json",
-      "checksum": "sha256:9e9b2938015ba09aea23166770bff188b7e58f0c929a033323838dc0caa46721"
+      "checksum": "sha256:095fcc56efe49b88d69a3c9bd71d5ed7834c11a81a47b3b2fd528ab21ad0c51d"
     },
     {
       "path": "normalized/agent-context.md",
@@ -30,15 +26,15 @@
     },
     {
       "path": "normalized/assets.json",
-      "checksum": "sha256:06a2ebf8a2a5652808f9d46a7025754f1855aa2cef5c446e3d8406d1ff9046fb"
+      "checksum": "sha256:9d250a6d272a66d88cc13d2b8cfd1eba2c7e378f9f2f8ffc537fda2c528652ee"
     },
     {
       "path": "normalized/components.json",
-      "checksum": "sha256:509817350d14e9ce571f0b023a62f00e4a99da53daf8b44638d90a30643e3938"
+      "checksum": "sha256:2db8a9d92e816f536d33cd82fc18fc1c73f75104156acff02d41101387efaf0c"
     },
     {
       "path": "normalized/dependencies.json",
-      "checksum": "sha256:dc3c18a5a251ebc2ef595232bfdf3bd513267d0ca29be8796064abf0d4c66a6d"
+      "checksum": "sha256:5696d525c213beda23d49961d4cea155efe83f747112b38ce25c4ecbb8fa0d9d"
     },
     {
       "path": "normalized/design-context.json",
@@ -46,11 +42,11 @@
     },
     {
       "path": "normalized/layers.json",
-      "checksum": "sha256:cfd8ee1539d4d4bd6e2faf0a89078a138f2ee91cfc19e22cb137a6f56cc39d39"
+      "checksum": "sha256:beceea79c53fd03960373eb6a49dfda915e1086d5938c68643d6bab8ad8a05d1"
     },
     {
       "path": "normalized/pixel-spec.json",
-      "checksum": "sha256:462f5ffd871122aa0e4483757422827bcb561a346fe744a14299160b90755f94"
+      "checksum": "sha256:af0b14f9096672947b3d2b77322e2dfe71565fd73f30b6ff39fbe8970907ba25"
     },
     {
       "path": "normalized/render-instructions.md",
@@ -70,7 +66,7 @@
     },
     {
       "path": "source/assets-manifest.json",
-      "checksum": "sha256:31691c9222ce15cbb37b93910e0c5980ba7d8656d7650b4ecf46f9114c320257"
+      "checksum": "sha256:d8c15cdf1da27797e0c57aae39061277e8e5452d5a378c26e59797274bc19334"
     },
     {
       "path": "source/capture.json",

@@ -12,19 +12,8 @@
       "width": 32,
       "height": 32,
       "sourceNodeIds": [],
-      "bindings": [
-        {
-          "nodeId": "node-1-40",
-          "figmaNodeId": "1:40",
-          "fit": "contain",
-          "crop": null,
-          "placement": {
-            "x": 920,
-            "y": 520,
-            "width": 32,
-            "height": 32
-          }
-        }
+      "usedByNodeIds": [
+        "node-1-40"
       ],
       "checksum": "sha256:677b1766d6fec7113f6a7f39cc8c2f00500788c20623a6205ce24cfcb48b348d",
       "required": true
@@ -39,24 +28,8 @@
       "width": 1,
       "height": 1,
       "sourceNodeIds": [],
-      "bindings": [
-        {
-          "nodeId": "node-1-50",
-          "figmaNodeId": "1:50",
-          "fit": "cover",
-          "crop": {
-            "x": 0,
-            "y": 0,
-            "width": 1,
-            "height": 1
-          },
-          "placement": {
-            "x": 1544,
-            "y": 96,
-            "width": 352,
-            "height": 880
-          }
-        }
+      "usedByNodeIds": [
+        "node-1-50"
       ],
       "checksum": "sha256:4b5c5c92cec3b23e6a294fc0eea43234ef5126c5a64f4c6c531ac8430ab0b844",
       "required": false

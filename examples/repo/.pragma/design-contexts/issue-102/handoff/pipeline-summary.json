@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-pipeline-summary",
+  "command": "design pack-from-figma-capture",
+  "generatedAt": "2026-07-07T10:31:45.474Z",
+  "input": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\figma-mcp-input",
+  "repo": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo",
+  "contextDir": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102",
+  "manifestPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\manifest.json",
+  "zipPath": "C:\\Users\\97667\\AppData\\Local\\Temp\\pragma-context-zip-drZoSd\\context.zip",
+  "issueFragmentPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\handoff\\issue-fragment.md",
+  "issueFragmentChecksum": "sha256:095fcc56efe49b88d69a3c9bd71d5ed7834c11a81a47b3b2fd528ab21ad0c51d",
+  "artifact": {
+    "storage": "repo",
+    "path": ".pragma/design-contexts/issue-102"
+  },
+  "preflightSummary": {
+    "repairs": 0,
+    "unresolved": 0,
+    "issues": 0,
+    "status": "ok"
+  },
+  "preflightRepairs": [],
+  "validationWarnings": [
+    "[TOKEN_MAPPING_MISSING_TOKEN_ID] pixel-spec node node-1-23.fills[0].color has resolvedValue but no tokenId",
+    "[TOKEN_MAPPING_MISSING_TOKEN_ID] pixel-spec node node-1-24.strokes[0].color has resolvedValue but no tokenId",
+    "[TOKEN_MAPPING_MISSING_TOKEN_ID] pixel-spec node node-1-25.text.typography has resolvedValue but no tokenId",
+    "[TOKEN_MAPPING_MISSING_TOKEN_ID] pixel-spec node node-1-30.fills[0].color has resolvedValue but no tokenId",
+    "[TOKEN_MAPPING_MISSING_TOKEN_ID] pixel-spec node node-1-50.radius has resolvedValue but no tokenId"
+  ],
+  "readSmokeCheck": {
+    "ok": true,
+    "manifestPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\manifest.json",
+    "agentContextPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\normalized\\agent-context.md",
+    "pixelSpecPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\normalized\\pixel-spec.json",
+    "dependenciesPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\normalized\\dependencies.json",
+    "assetsPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\normalized\\assets.json",
+    "tokensPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\normalized\\tokens.json",
+    "componentsPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\normalized\\components.json",
+    "renderInstructionsPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\normalized\\render-instructions.md",
+    "visualBaselinePath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\validation\\visual-baseline.json"
+  },
+  "timings": {
+    "resolveInputMs": 0.05,
+    "preflightMs": 26.83,
+    "ingestMs": 184.26,
+    "packZipMs": 1607.63,
+    "publishMs": 63.36,
+    "issueFragmentMs": 51.33,
+    "validateMs": 45.57,
+    "readSmokeCheckMs": 50.09
+  }
+}

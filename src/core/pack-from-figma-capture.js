@@ -71,7 +71,7 @@ export async function packFromFigmaCapture(options) {
   }
   const ingest = await timeStage(timings, "ingestMs", () => ingestDesignContext({ ...options, input: preflight.inputDir, repo: preflight.repoPath }));
   const context = ingest.contextDir;
-  const pack = await timeStage(timings, "packZipMs", () => packDesignContext({ ...options, context, zip: options.zip || path.join(context, "context.zip") }));
+  const pack = await timeStage(timings, "packZipMs", () => packDesignContext({ ...options, context, zip: options.zip }));
   const publish = await timeStage(timings, "publishMs", () => publishDesignContext({ ...options, context, zip: pack.zipPath }));
   const fragmentOutput = options["issue-fragment-output"] || options.issueFragmentOutput || path.join(context, "handoff", "issue-fragment.md");
   const fragment = await timeStage(timings, "issueFragmentMs", () => createIssueFragment({ context, output: fragmentOutput }));

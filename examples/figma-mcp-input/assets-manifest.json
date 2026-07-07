@@ -8,7 +8,8 @@
       "path": "icons/drone.svg",
       "width": 32,
       "height": 32,
-      "required": true
+      "required": true,
+      "checksum": "sha256:677b1766d6fec7113f6a7f39cc8c2f00500788c20623a6205ce24cfcb48b348d"
     },
     {
       "id": "asset-panel-bg",
@@ -18,7 +19,8 @@
       "path": "images/panel-bg.png",
       "width": 1,
       "height": 1,
-      "required": false
+      "required": false,
+      "checksum": "sha256:4b5c5c92cec3b23e6a294fc0eea43234ef5126c5a64f4c6c531ac8430ab0b844"
     }
   ]
 }

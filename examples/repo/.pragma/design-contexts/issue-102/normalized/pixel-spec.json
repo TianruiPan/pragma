@@ -11,6 +11,7 @@
     {
       "id": "node-1-23",
       "figmaNodeId": "1:23",
+      "layerRef": "node-1-23",
       "name": "Map Monitoring Page",
       "type": "frame",
       "zIndex": 0,
@@ -27,7 +28,9 @@
       "fills": [
         {
           "type": "solid",
-          "color": "#07131C",
+          "color": {
+            "resolvedValue": "#07131C"
+          },
           "opacity": 1
         }
       ],
@@ -39,17 +42,12 @@
       "text": null,
       "assetBinding": null,
       "componentRef": null,
-      "state": "default",
-      "children": [
-        "node-1-24",
-        "node-1-30",
-        "node-1-40",
-        "node-1-50"
-      ]
+      "state": "default"
     },
     {
       "id": "node-1-24",
       "figmaNodeId": "1:24",
+      "layerRef": "node-1-24",
       "name": "Top Filter Bar",
       "type": "frame",
       "zIndex": 1,
@@ -74,22 +72,30 @@
       "fills": [
         {
           "type": "solid",
-          "color": "#0D2636",
+          "color": {
+            "tokenId": "color-surface-panel",
+            "resolvedValue": "#0D2636"
+          },
           "opacity": 0.92
         }
       ],
       "strokes": [
         {
-          "color": "#2A5D77",
+          "color": {
+            "resolvedValue": "#2A5D77"
+          },
           "width": 1,
           "position": "inside"
         }
       ],
       "radius": {
-        "topLeft": 12,
-        "topRight": 12,
-        "bottomRight": 12,
-        "bottomLeft": 12
+        "tokenId": "radius-panel",
+        "resolvedValue": {
+          "topLeft": 12,
+          "topRight": 12,
+          "bottomRight": 12,
+          "bottomLeft": 12
+        }
       },
       "shadow": [],
       "opacity": 1,
@@ -102,14 +108,12 @@
           "size": "default"
         }
       },
-      "state": "default",
-      "children": [
-        "node-1-25"
-      ]
+      "state": "default"
     },
     {
       "id": "node-1-25",
       "figmaNodeId": "1:25",
+      "layerRef": "node-1-25",
       "name": "Filter Label",
       "type": "text",
       "zIndex": 2,
@@ -137,16 +141,28 @@
         "lineHeight": 24,
         "letterSpacing": 0,
         "align": "left",
-        "color": "#EAF7FF"
+        "color": {
+          "tokenId": "color-text-primary",
+          "resolvedValue": "#EAF7FF"
+        },
+        "typography": {
+          "resolvedValue": {
+            "fontFamily": "Source Han Sans SC",
+            "fontWeight": 500,
+            "fontSize": 16,
+            "lineHeight": 24,
+            "letterSpacing": 0
+          }
+        }
       },
       "assetBinding": null,
       "componentRef": null,
-      "state": "default",
-      "children": []
+      "state": "default"
     },
     {
       "id": "node-1-30",
       "figmaNodeId": "1:30",
+      "layerRef": "node-1-30",
       "name": "Dynamic Map Surface",
       "type": "frame",
       "zIndex": 3,
@@ -163,7 +179,9 @@
       "fills": [
         {
           "type": "solid",
-          "color": "#09202E",
+          "color": {
+            "resolvedValue": "#09202E"
+          },
           "opacity": 1
         }
       ],
@@ -175,12 +193,12 @@
       "text": null,
       "assetBinding": null,
       "componentRef": null,
-      "state": "default",
-      "children": []
+      "state": "default"
     },
     {
       "id": "node-1-40",
       "figmaNodeId": "1:40",
+      "layerRef": "node-1-40",
       "name": "Drone Marker Icon",
       "type": "image",
       "zIndex": 4,
@@ -215,12 +233,12 @@
         }
       },
       "componentRef": null,
-      "state": "default",
-      "children": []
+      "state": "default"
     },
     {
       "id": "node-1-50",
       "figmaNodeId": "1:50",
+      "layerRef": "node-1-50",
       "name": "Right Event Drawer",
       "type": "frame",
       "zIndex": 5,
@@ -237,16 +255,21 @@
       "fills": [
         {
           "type": "solid",
-          "color": "#0D2636",
+          "color": {
+            "tokenId": "color-surface-panel",
+            "resolvedValue": "#0D2636"
+          },
           "opacity": 0.88
         }
       ],
       "strokes": [],
       "radius": {
-        "topLeft": 16,
-        "topRight": 16,
-        "bottomRight": 16,
-        "bottomLeft": 16
+        "resolvedValue": {
+          "topLeft": 16,
+          "topRight": 16,
+          "bottomRight": 16,
+          "bottomLeft": 16
+        }
       },
       "shadow": [],
       "opacity": 1,
@@ -276,41 +299,7 @@
           "severity": "normal"
         }
       },
-      "state": "default",
-      "children": []
-    }
-  ],
-  "assetBindings": [
-    {
-      "nodeId": "node-1-40",
-      "figmaNodeId": "1:40",
-      "assetId": "asset-drone-icon",
-      "fit": "contain",
-      "crop": null,
-      "placement": {
-        "x": 920,
-        "y": 520,
-        "width": 32,
-        "height": 32
-      }
-    },
-    {
-      "nodeId": "node-1-50",
-      "figmaNodeId": "1:50",
-      "assetId": "asset-panel-bg",
-      "fit": "cover",
-      "crop": {
-        "x": 0,
-        "y": 0,
-        "width": 1,
-        "height": 1
-      },
-      "placement": {
-        "x": 1544,
-        "y": 96,
-        "width": 352,
-        "height": 880
-      }
+      "state": "default"
     }
   ],
   "states": [

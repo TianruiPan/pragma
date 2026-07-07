@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import { pathExists, listFilesRecursive, normalizeRelativePosix, relativePosix, safeJoin } from "./fs.js";
 import { sha256File } from "./checksum.js";
@@ -21,6 +22,20 @@ export function asArray(value) {
 export function detectAssetType(filePath, explicitType) {
   if (explicitType) return String(explicitType).replace(/^\./, "").toLowerCase();
   return typeFromExtension(filePath) || "binary";
+}
+
+export function isFrameRenderAsset(asset = {}, relPath = "") {
+  const text = [
+    relPath,
+    asset.path,
+    asset.fileName,
+    asset.filename,
+    asset.name,
+    asset.role,
+    asset.type
+  ].filter(Boolean).join(" ").toLowerCase();
+  return /(^|[-_/\s])(frame[-_\s]?render|render[-_\s]?reference|visual[-_\s]?baseline|baseline[-_\s]?screenshot|screenshot|screen[-_\s]?shot)(?=\.|[-_/\s]|$)/i.test(text)
+    || /(^|[-_/\s])render\.(png|jpe?g|webp|svg)$/i.test(text);
 }
 
 async function normalizeAssetMetadata({ contextDir, outputRel, asset, id }) {
@@ -71,8 +86,13 @@ export async function normalizeAssets(contextDir, inputManifest = undefined, ass
         }
       }
       if (!outputRel) continue;
+      if (isFrameRenderAsset(asset, outputRel)) continue;
       const id = asset.id || `asset-${slugify(path.basename(outputRel, path.extname(outputRel)), String(index + 1))}`;
       const metadata = await normalizeAssetMetadata({ contextDir, outputRel, asset, id });
+      const matchingBindings = [
+        ...asArray(asset.bindings),
+        ...assetBindings.filter((binding) => binding.assetId === id)
+      ];
       normalized.push({
         id,
         name: asset.name || path.basename(outputRel),
@@ -82,17 +102,8 @@ export async function normalizeAssets(contextDir, inputManifest = undefined, ass
         path: outputRel,
         width: metadata.width,
         height: metadata.height,
-        sourceNodeIds: asset.sourceNodeIds || asset.sourceNodeId ? asArray(asset.sourceNodeIds || asset.sourceNodeId) : [],
-        bindings: [
-          ...asArray(asset.bindings),
-          ...assetBindings.filter((binding) => binding.assetId === id)
-        ].map((binding) => ({
-          nodeId: binding.nodeId,
-          figmaNodeId: binding.figmaNodeId,
-          fit: binding.fit || "contain",
-          crop: binding.crop ?? null,
-          placement: binding.placement
-        })),
+        sourceNodeIds: [...new Set(asArray(asset.sourceNodeIds || asset.sourceNodeId).filter(Boolean))],
+        usedByNodeIds: [...new Set(matchingBindings.map((binding) => binding.nodeId).filter(Boolean))],
         checksum: metadata.checksum,
         required: asset.required !== false
       });
@@ -103,8 +114,10 @@ export async function normalizeAssets(contextDir, inputManifest = undefined, ass
   const normalized = [];
   for (const [index, file] of files.entries()) {
     const rel = relativePosix(contextDir, file);
+    if (isFrameRenderAsset({}, rel)) continue;
     const id = `asset-${slugify(path.basename(file, path.extname(file)), String(index + 1))}`;
     const metadata = await normalizeAssetMetadata({ contextDir, outputRel: rel, asset: {}, id });
+    const matchingBindings = assetBindings.filter((binding) => binding.assetId === id);
     normalized.push({
       id,
       name: path.basename(file),
@@ -115,18 +128,35 @@ export async function normalizeAssets(contextDir, inputManifest = undefined, ass
       width: metadata.width,
       height: metadata.height,
       sourceNodeIds: [],
-      bindings: assetBindings.filter((binding) => binding.assetId === id).map((binding) => ({
-        nodeId: binding.nodeId,
-        figmaNodeId: binding.figmaNodeId,
-        fit: binding.fit || "contain",
-        crop: binding.crop ?? null,
-        placement: binding.placement
-      })),
+      usedByNodeIds: [...new Set(matchingBindings.map((binding) => binding.nodeId).filter(Boolean))],
       checksum: metadata.checksum,
       required: true
     });
   }
   return normalized;
+}
+
+async function removeEmptyAssetDirs(dir, root) {
+  if (!(await pathExists(dir))) return;
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory()) await removeEmptyAssetDirs(path.join(dir, entry.name), root);
+  }
+  const after = await fs.readdir(dir);
+  if (after.length === 0 && path.resolve(dir) !== path.resolve(root)) {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
+}
+
+export async function pruneUnreferencedAssetFiles(contextDir, assets = []) {
+  const assetsRoot = path.join(contextDir, "assets");
+  if (!(await pathExists(assetsRoot))) return;
+  const keep = new Set(assets.map((asset) => normalizeRelativePosix(asset.path || "")).filter(Boolean));
+  for (const file of await listFilesRecursive(assetsRoot)) {
+    const rel = relativePosix(contextDir, file);
+    if (!keep.has(rel)) await fs.rm(file, { force: true });
+  }
+  await removeEmptyAssetDirs(assetsRoot, assetsRoot);
 }
 
 export async function listContextFiles(contextDir, childDir) {

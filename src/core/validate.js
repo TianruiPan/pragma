@@ -6,6 +6,7 @@ import { sha256File } from "./checksum.js";
 import { isConcreteSnapshotId, isValidDependencyStatus } from "./dependencies.js";
 import { normalizeFigmaNodeId, parseFigmaUrl } from "./figma-url.js";
 import { mimeForType, sniffAssetFile, typeFromExtension } from "./mime.js";
+import { isFrameRenderAsset } from "./normalize.js";
 import { utf8Diagnostics } from "./text-encoding.js";
 
 function assert(condition, message, errors) {
@@ -65,6 +66,78 @@ function collectAssetBindingRefs(pixelSpec) {
     if (node.assetBinding) refs.push({ ...node.assetBinding, nodeId: node.assetBinding.nodeId || node.id, figmaNodeId: node.assetBinding.figmaNodeId || node.figmaNodeId });
   }
   return refs;
+}
+
+const LAYER_INLINE_FORBIDDEN_FIELDS = [
+  "bounds",
+  "layout",
+  "fills",
+  "fill",
+  "strokes",
+  "stroke",
+  "radius",
+  "cornerRadius",
+  "shadow",
+  "shadows",
+  "effects",
+  "text",
+  "assetBinding",
+  "assetBindings",
+  "fit",
+  "crop",
+  "placement",
+  "componentRef"
+];
+
+const ASSET_INLINE_FORBIDDEN_FIELDS = ["bindings", "fit", "crop", "placement"];
+
+function hasOwn(value, key) {
+  return Object.prototype.hasOwnProperty.call(value || {}, key);
+}
+
+function validateTokenMapping(value, { path: fieldPath, type, tokenIds, errors, warnings, issues, allowMissingTokenId = true }) {
+  if (value === undefined || value === null) return;
+  if (!value || typeof value !== "object" || !hasOwn(value, "resolvedValue")) {
+    validationIssue(errors, issues, "TOKEN_MAPPING_MISSING_RESOLVED_VALUE", `${fieldPath} must include resolvedValue${type ? ` for ${type}` : ""}`, { path: fieldPath, type });
+    return;
+  }
+  if (value.tokenId) {
+    assert(tokenIds.has(value.tokenId), `${fieldPath} references unknown tokenId ${value.tokenId}`, errors);
+  } else if (allowMissingTokenId) {
+    validationWarning(warnings, issues, "TOKEN_MAPPING_MISSING_TOKEN_ID", `${fieldPath} has resolvedValue but no tokenId`, { path: fieldPath, type });
+  }
+}
+
+function validatePaintMappings(paints, fieldPath, tokenIds, errors, warnings, issues) {
+  for (const [index, paint] of asArray(paints).entries()) {
+    if (paint && typeof paint === "object" && hasOwn(paint, "color")) {
+      validateTokenMapping(paint.color, { path: `${fieldPath}[${index}].color`, type: "color", tokenIds, errors, warnings, issues });
+    }
+  }
+}
+
+function validatePixelTokenMappings(pixelSpec, tokenIds, errors, warnings, issues) {
+  for (const node of asArray(pixelSpec?.nodes)) {
+    const nodePath = `pixel-spec node ${node.id || "<unknown>"}`;
+    validatePaintMappings(node.fills, `${nodePath}.fills`, tokenIds, errors, warnings, issues);
+    validatePaintMappings(node.strokes, `${nodePath}.strokes`, tokenIds, errors, warnings, issues);
+    if (node.radius !== undefined && node.radius !== null) {
+      validateTokenMapping(node.radius, { path: `${nodePath}.radius`, type: "radius", tokenIds, errors, warnings, issues });
+    }
+    for (const [index, shadow] of asArray(node.shadow).entries()) {
+      validateTokenMapping(shadow, { path: `${nodePath}.shadow[${index}]`, type: "shadow", tokenIds, errors, warnings, issues });
+    }
+    if (node.text) {
+      if (node.text.color !== undefined) {
+        validateTokenMapping(node.text.color, { path: `${nodePath}.text.color`, type: "color", tokenIds, errors, warnings, issues });
+      }
+      if (node.text.typography !== undefined) {
+        validateTokenMapping(node.text.typography, { path: `${nodePath}.text.typography`, type: "typography", tokenIds, errors, warnings, issues });
+      } else if (["fontFamily", "fontWeight", "fontSize", "lineHeight", "letterSpacing"].some((key) => node.text[key] !== undefined)) {
+        validationIssue(errors, issues, "TOKEN_MAPPING_MISSING_RESOLVED_VALUE", `${nodePath}.text.typography must include resolvedValue`, { path: `${nodePath}.text.typography`, type: "typography" });
+      }
+    }
+  }
 }
 
 async function readEntrypointJson(contextDir, entrypoints, key, errors) {
@@ -490,9 +563,13 @@ export async function validateDesignContext(options) {
     for (const node of asArray(pixelSpec.nodes)) {
       assert(Boolean(node.id), "pixel-spec node.id is required", errors);
       assert(Boolean(node.figmaNodeId), `pixel-spec node ${node.id || "<unknown>"} figmaNodeId is required`, errors);
+      assert(Boolean(node.layerRef), `pixel-spec node ${node.id || "<unknown>"} layerRef is required`, errors);
       assert(Boolean(node.name), `pixel-spec node ${node.id || "<unknown>"} name is required`, errors);
       assert(Boolean(node.type), `pixel-spec node ${node.id || "<unknown>"} type is required`, errors);
       assert(node.bounds && Number.isFinite(Number(node.bounds.width)) && Number.isFinite(Number(node.bounds.height)), `pixel-spec node ${node.id || "<unknown>"} bounds are required`, errors);
+      if (Array.isArray(node.children) && node.children.length > 0) {
+        validationIssue(errors, issues, "NORMALIZED_CANONICAL_OWNERSHIP", `pixel-spec node ${node.id || "<unknown>"} must not duplicate layer tree children`, { path: "normalized/pixel-spec.json", nodeId: node.id, field: "children" });
+      }
       if (node.id) pixelNodeIds.add(node.id);
       if (node.figmaNodeId) pixelFigmaNodeIds.add(node.figmaNodeId);
     }
@@ -511,6 +588,7 @@ export async function validateDesignContext(options) {
     }
   }
 
+  const layerIds = new Set();
   const layerFigmaNodeIds = new Set();
   if (layers) {
     assert(layers.schemaVersion === "2.0", "layers.schemaVersion must be 2.0", errors);
@@ -518,16 +596,28 @@ export async function validateDesignContext(options) {
     assert(Array.isArray(layers.rootNodeIds), "layers.rootNodeIds must be an array", errors);
     assert(Array.isArray(layers.nodes), "layers.nodes must be an array", errors);
     for (const node of asArray(layers.nodes)) {
+      assert(Boolean(node.id), "layer node id is required", errors);
       assert(Boolean(node.figmaNodeId), "layer node figmaNodeId is required", errors);
+      if (node.id) layerIds.add(node.id);
       if (node.figmaNodeId) layerFigmaNodeIds.add(node.figmaNodeId);
+      for (const field of LAYER_INLINE_FORBIDDEN_FIELDS) {
+        if (hasOwn(node, field)) {
+          validationIssue(errors, issues, "NORMALIZED_CANONICAL_OWNERSHIP", `layers node ${node.id || node.figmaNodeId || "<unknown>"} must not inline ${field}`, { path: "normalized/layers.json", nodeId: node.id || node.figmaNodeId, field });
+        }
+      }
     }
     for (const rootNodeId of asArray(layers.rootNodeIds)) {
-      assert(layerFigmaNodeIds.has(rootNodeId), `layers.rootNodeIds references unknown node ${rootNodeId}`, errors);
+      assert(layerIds.has(rootNodeId) || layerFigmaNodeIds.has(rootNodeId), `layers.rootNodeIds references unknown node ${rootNodeId}`, errors);
     }
     for (const node of asArray(layers.nodes)) {
       for (const child of asArray(node.children)) {
-        assert(layerFigmaNodeIds.has(child), `layer ${node.figmaNodeId || "<unknown>"} references unknown child ${child}`, errors);
+        assert(layerIds.has(child) || layerFigmaNodeIds.has(child), `layer ${node.id || node.figmaNodeId || "<unknown>"} references unknown child ${child}`, errors);
       }
+    }
+  }
+  if (pixelSpec && layers) {
+    for (const node of asArray(pixelSpec.nodes)) {
+      assert(layerIds.has(node.layerRef) || layerFigmaNodeIds.has(node.layerRef), `pixel-spec node ${node.id || "<unknown>"} references unknown layerRef ${node.layerRef}`, errors);
     }
   }
 
@@ -542,6 +632,7 @@ export async function validateDesignContext(options) {
     for (const tokenId of tokenRefs) {
       assert(tokenIds.has(tokenId), `pixel-spec references unknown tokenId ${tokenId}`, errors);
     }
+    validatePixelTokenMappings(pixelSpec, tokenIds, errors, warnings, issues);
   }
 
   const componentIds = collectComponentIds(components);
@@ -555,7 +646,9 @@ export async function validateDesignContext(options) {
       for (const instance of asArray(components.instances)) {
         assert(Boolean(instance.nodeId), "component instance nodeId is required", errors);
         assert(Boolean(instance.figmaNodeId), `component instance ${instance.nodeId || "<unknown>"} figmaNodeId is required`, errors);
-        assert(instance.bounds && Number.isFinite(Number(instance.bounds.width)) && Number.isFinite(Number(instance.bounds.height)), `component instance ${instance.nodeId || "<unknown>"} bounds are required`, errors);
+        if (hasOwn(instance, "bounds")) {
+          validationIssue(errors, issues, "NORMALIZED_CANONICAL_OWNERSHIP", `component instance ${instance.nodeId || "<unknown>"} must not duplicate bounds; use pixel-spec node bounds`, { path: "normalized/components.json", nodeId: instance.nodeId, field: "bounds" });
+        }
       }
     } else {
       assert(Array.isArray(components.components), "components.components must be an array", errors);
@@ -645,7 +738,15 @@ export async function validateDesignContext(options) {
       if (asset.id) assetIds.add(asset.id);
       assert(Boolean(asset.path), `asset ${asset.id || "<unknown>"} path is required`, errors);
       assert(Boolean(asset.mime), `asset ${asset.id || "<unknown>"} mime is required`, errors);
+      for (const field of ASSET_INLINE_FORBIDDEN_FIELDS) {
+        if (hasOwn(asset, field)) {
+          validationIssue(errors, issues, "NORMALIZED_CANONICAL_OWNERSHIP", `asset ${asset.id || "<unknown>"} must not inline ${field}; placement belongs in pixel-spec assetBinding`, { path: "normalized/assets.json", assetId: asset.id, field });
+        }
+      }
       if (asset.path) {
+        if (isFrameRenderAsset(asset, asset.path)) {
+          validationIssue(errors, issues, "ASSET_FRAME_RENDER_IN_ASSETS", `frame render or baseline screenshot must not be stored as an implementation asset: ${asset.path}`, { path: asset.path, assetId: asset.id });
+        }
         const assetPath = path.join(contextDir, asset.path);
         const exists = await pathExists(assetPath);
         if (!exists && assetsMayBeExternal) {
@@ -670,10 +771,17 @@ export async function validateDesignContext(options) {
           if (asset.height !== undefined && sniffed.height !== undefined) assert(Number(asset.height) === Number(sniffed.height), `asset ${asset.id} height does not match file dimensions`, errors);
         }
       }
-      for (const binding of asArray(asset.bindings)) {
-        assert(binding.nodeId || binding.figmaNodeId, `asset ${asset.id || "<unknown>"} binding needs nodeId or figmaNodeId`, errors);
-        if (binding.nodeId) assert(pixelNodeIds.has(binding.nodeId), `asset ${asset.id || "<unknown>"} binding references unknown nodeId ${binding.nodeId}`, errors);
-        if (binding.figmaNodeId) assert(pixelFigmaNodeIds.has(binding.figmaNodeId) || layerFigmaNodeIds.has(binding.figmaNodeId), `asset ${asset.id || "<unknown>"} binding references unknown figmaNodeId ${binding.figmaNodeId}`, errors);
+      for (const nodeId of asArray(asset.usedByNodeIds)) {
+        assert(pixelNodeIds.has(nodeId), `asset ${asset.id || "<unknown>"} usedByNodeIds references unknown nodeId ${nodeId}`, errors);
+      }
+    }
+  }
+  const assetsDir = path.join(contextDir, entrypoints.assetsDir || "assets");
+  if (await pathExists(assetsDir)) {
+    for (const file of await listFilesRecursive(assetsDir)) {
+      const rel = path.relative(contextDir, file).replace(/\\/g, "/");
+      if (isFrameRenderAsset({}, rel)) {
+        validationIssue(errors, issues, "ASSET_FRAME_RENDER_IN_ASSETS", `frame render or baseline screenshot must not be stored under assets/: ${rel}`, { path: rel });
       }
     }
   }
@@ -714,6 +822,17 @@ export async function validateDesignContext(options) {
 
   await validateUtf8Tree(contextDir, errors);
   assertFigmaSourceConsistency({ manifest, metadata: sourceMetadata, selection: sourceSelection }, errors);
+
+  const localContextZip = path.join(contextDir, manifest.artifact?.fileName || "context.zip");
+  if (await pathExists(localContextZip)) {
+    if (manifest.artifact?.storage === "repo") {
+      validationIssue(errors, issues, "CONTEXT_ZIP_SHOULD_NOT_BE_COMMITTED", "context.zip must not be present in a repo-stored <=20MB Design Context Package", { path: path.relative(contextDir, localContextZip).replace(/\\/g, "/") });
+    }
+    if (manifest.artifact?.checksum) {
+      const actual = await sha256File(localContextZip);
+      assert(actual === manifest.artifact.checksum, "context.zip checksum does not match manifest.artifact.checksum", errors);
+    }
+  }
 
   const checksumsPath = path.join(contextDir, "checksums.json");
   if (await pathExists(checksumsPath)) {

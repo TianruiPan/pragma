@@ -8,6 +8,7 @@ import { readDesignContext } from "./core/read.js";
 import { resolveDesignAsset } from "./core/asset.js";
 import { validateDesignContext } from "./core/validate.js";
 import { packFromFigmaCapture } from "./core/pack-from-figma-capture.js";
+import { packLatestCapture } from "./core/pack-latest-capture.js";
 import { enrichAgentContext } from "./core/enrich.js";
 import { fromFigma } from "./core/from-figma.js";
 import { preflightFigmaCapture } from "./core/preflight.js";
@@ -56,6 +57,7 @@ function help() {
     `  pragma design publish --context <dir> [--threshold-mb 20] [--dry-run] [--prune-repo]\n` +
     `  pragma design issue-fragment --context <dir> [--output fragment.md]\n` +
     `  pragma design pack-from-figma-capture --input <dir> --repo <repo> [--force] [--issue-fragment-output fragment.md]\n` +
+    `  pragma design pack-latest-capture --repo <repo> --issue <number> [--input <pragma-input>] [--preflight-only] [--force] [--threshold-mb 20] [--json]\n` +
     `  pragma design enrich --context <dir> --notes <text> [--generated-by <id>] [--model <model>]\n` +
     `  pragma design read --context <dir> | --repo <repo> --issue 102 | --dev-issue-file issue.md\n` +
     `  pragma design asset --context <dir> --id <asset-id> [--copy-to <path>]\n` +
@@ -143,6 +145,12 @@ async function main(argv) {
     case "pack-from-figma-capture": {
       const result = await packFromFigmaCapture(options);
       printJson({ ok: true, command: "design pack-from-figma-capture", ...result });
+      return;
+    }
+    case "pack-latest-capture": {
+      const result = await packLatestCapture(options);
+      printJson(result);
+      if (!result.ok) process.exitCode = 2;
       return;
     }
     case "enrich": {

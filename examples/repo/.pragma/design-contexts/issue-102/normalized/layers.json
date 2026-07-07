@@ -2,109 +2,74 @@
   "schemaVersion": "2.0",
   "kind": "pragma-layer-tree",
   "rootNodeIds": [
-    "1:23"
+    "node-1-23"
   ],
   "nodes": [
     {
+      "id": "node-1-23",
       "figmaNodeId": "1:23",
       "normalizedNodeId": "node-1-23",
       "name": "Map Monitoring Page",
       "type": "FRAME",
-      "bounds": {
-        "x": 0,
-        "y": 0,
-        "width": 1920,
-        "height": 1080
-      },
-      "componentRef": null,
       "children": [
-        "1:24",
-        "1:30",
-        "1:40",
-        "1:50"
-      ]
+        "node-1-24",
+        "node-1-30",
+        "node-1-40",
+        "node-1-50"
+      ],
+      "sourceOrder": 0
     },
     {
+      "id": "node-1-24",
       "figmaNodeId": "1:24",
       "normalizedNodeId": "node-1-24",
       "name": "Top Filter Bar",
       "type": "FRAME",
-      "bounds": {
-        "x": 24,
-        "y": 24,
-        "width": 760,
-        "height": 64
-      },
-      "componentRef": {
-        "componentId": "component-filter-bar",
-        "variant": {
-          "size": "default"
-        }
-      },
+      "parentId": "node-1-23",
       "children": [
-        "1:25"
-      ]
+        "node-1-25"
+      ],
+      "sourceOrder": 1
     },
     {
+      "id": "node-1-25",
       "figmaNodeId": "1:25",
       "normalizedNodeId": "node-1-25",
       "name": "Filter Label",
       "type": "TEXT",
-      "bounds": {
-        "x": 48,
-        "y": 44,
-        "width": 96,
-        "height": 24
-      },
-      "componentRef": null,
-      "children": []
+      "parentId": "node-1-24",
+      "children": [],
+      "sourceOrder": 2
     },
     {
+      "id": "node-1-30",
       "figmaNodeId": "1:30",
       "normalizedNodeId": "node-1-30",
       "name": "Dynamic Map Surface",
       "type": "FRAME",
-      "bounds": {
-        "x": 0,
-        "y": 0,
-        "width": 1920,
-        "height": 1080
-      },
-      "componentRef": null,
-      "children": []
+      "parentId": "node-1-23",
+      "children": [],
+      "sourceOrder": 3
     },
     {
+      "id": "node-1-40",
       "figmaNodeId": "1:40",
       "normalizedNodeId": "node-1-40",
       "name": "Drone Marker Icon",
       "type": "IMAGE",
-      "bounds": {
-        "x": 920,
-        "y": 520,
-        "width": 32,
-        "height": 32
-      },
-      "componentRef": null,
-      "children": []
+      "parentId": "node-1-23",
+      "children": [],
+      "sourceOrder": 4
     },
     {
+      "id": "node-1-50",
       "figmaNodeId": "1:50",
       "normalizedNodeId": "node-1-50",
       "name": "Right Event Drawer",
       "type": "FRAME",
-      "bounds": {
-        "x": 1544,
-        "y": 96,
-        "width": 352,
-        "height": 880
-      },
-      "componentRef": {
-        "componentId": "component-warning-card",
-        "variant": {
-          "severity": "normal"
-        }
-      },
-      "children": []
+      "parentId": "node-1-23",
+      "children": [],
+      "sourceOrder": 5
     }
   ]
 }
