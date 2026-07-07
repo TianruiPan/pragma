@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-design-assets",
+  "assets": [
+    {
+      "id": "asset-drone-icon",
+      "name": "Drone marker icon",
+      "role": "map-marker",
+      "type": "svg",
+      "path": "assets/icons/drone.svg",
+      "width": 32,
+      "height": 32,
+      "checksum": "sha256:677b1766d6fec7113f6a7f39cc8c2f00500788c20623a6205ce24cfcb48b348d",
+      "required": true
+    },
+    {
+      "id": "asset-panel-bg",
+      "name": "Panel background placeholder",
+      "role": "panel-background",
+      "type": "webp",
+      "path": "assets/images/panel-bg.webp",
+      "width": 320,
+      "height": 180,
+      "checksum": "sha256:2c4fefd6eff969d3d8d3ce59a1cbcc47012ad69634f5b48db894bc25d606001e",
+      "required": false
+    }
+  ]
+}

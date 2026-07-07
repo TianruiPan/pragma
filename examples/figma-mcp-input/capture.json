@@ -1,0 +1,26 @@
+{
+  "repo": {
+    "owner": "example-org",
+    "name": "flight-ops-console",
+    "localPath": "examples/repo"
+  },
+  "designIssue": {
+    "number": 102,
+    "title": "Map monitoring page design context"
+  },
+  "targetDevIssues": [
+    {
+      "number": 101,
+      "title": "Implement map monitoring page"
+    }
+  ],
+  "figma": {
+    "fileKey": "demoFigmaFileKey",
+    "nodeIds": ["1:23"],
+    "selectionMode": "explicit-node-ids",
+    "url": "https://www.figma.com/design/demoFigmaFileKey/Demo?node-id=1-23"
+  },
+  "blueLakeUrl": "https://lanhuapp.com/demo/project/map-monitoring",
+  "capturedAt": "2026-07-06T10:00:00+08:00",
+  "skillVersion": "figma-mcp-skill-demo"
+}

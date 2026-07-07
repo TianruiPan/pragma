@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-design-context-package",
+  "id": "design-context-issue-102-v1",
+  "version": "issue-102-v1",
+  "issue": {
+    "provider": "gitea",
+    "repo": "example-org/flight-ops-console",
+    "number": 102,
+    "title": "Map monitoring page design context",
+    "targetDevIssues": [
+      {
+        "number": 101,
+        "title": "Implement map monitoring page"
+      }
+    ]
+  },
+  "source": {
+    "provider": "figma",
+    "adapter": "figma-mcp",
+    "fileKey": "demoFigmaFileKey",
+    "nodes": [
+      "1:23"
+    ],
+    "capturedAt": "2026-07-06T10:00:00+08:00",
+    "sourceChecksum": "sha256:f5dc9989fa0a7abcbf0d970fb48832ac4005dee90eb430200323e117ebc5d48c"
+  },
+  "entrypoints": {
+    "humanHandoff": "handoff/README.md",
+    "lanhuUrl": "https://lanhuapp.com/demo/project/map-monitoring",
+    "agentContext": "normalized/agent-context.md",
+    "designContext": "normalized/design-context.json",
+    "assetsManifest": "normalized/assets.json",
+    "assetsDir": "assets/",
+    "screenshots": "screenshots/"
+  },
+  "artifact": {
+    "storage": "repo",
+    "path": ".pragma/design-contexts/issue-102"
+  }
+}

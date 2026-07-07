@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pragma.local/schemas/pragma-2.0/assets.schema.json",
+  "title": "Pragma 2.0 Design Assets Manifest",
+  "type": "object",
+  "required": ["schemaVersion", "kind", "assets"],
+  "properties": {
+    "schemaVersion": { "const": "2.0" },
+    "kind": { "const": "pragma-design-assets" },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "type", "path", "checksum"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "role": { "type": "string" },
+          "type": { "type": "string" },
+          "path": { "type": "string" },
+          "width": { "type": "number" },
+          "height": { "type": "number" },
+          "checksum": { "type": "string", "pattern": "^sha256:" },
+          "required": { "type": "boolean" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

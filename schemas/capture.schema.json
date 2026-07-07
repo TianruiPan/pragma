@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pragma.local/schemas/pragma-2.0/capture.schema.json",
+  "title": "Pragma 2.0 Figma MCP Skill Capture Input",
+  "type": "object",
+  "required": ["repo", "designIssue", "figma"],
+  "properties": {
+    "repo": {
+      "type": "object",
+      "required": ["owner", "name"],
+      "properties": {
+        "owner": { "type": "string" },
+        "name": { "type": "string" },
+        "localPath": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "designIssue": {
+      "type": "object",
+      "required": ["number"],
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "targetDevIssues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["number"],
+        "properties": {
+          "number": { "type": "integer", "minimum": 1 },
+          "title": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "figma": {
+      "type": "object",
+      "required": ["fileKey", "nodeIds"],
+      "properties": {
+        "fileKey": { "type": "string" },
+        "nodeIds": { "type": "array", "items": { "type": "string" } },
+        "selectionMode": { "type": "string" },
+        "url": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "blueLakeUrl": { "type": "string" },
+    "designerNotes": { "type": "string" },
+    "dynamicRegionNotes": { "type": "string" },
+    "capturedAt": { "type": "string" },
+    "skillVersion": { "type": "string" }
+  },
+  "additionalProperties": true
+}

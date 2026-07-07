@@ -1,0 +1,10 @@
+{
+  "colors": {
+    "surface.panel": "#0D2636",
+    "accent.alert": "#FFB020",
+    "text.primary": "#EAF7FF"
+  },
+  "radius": {
+    "panel": 12
+  }
+}

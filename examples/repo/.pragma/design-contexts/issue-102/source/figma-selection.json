@@ -1,0 +1,11 @@
+{
+  "nodes": [
+    {
+      "id": "1:23",
+      "name": "Map Monitoring Page",
+      "type": "FRAME",
+      "width": 1920,
+      "height": 1080
+    }
+  ]
+}

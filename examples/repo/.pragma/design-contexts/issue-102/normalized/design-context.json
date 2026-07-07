@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-design-context",
+  "id": "design-context-issue-102-v1",
+  "version": "issue-102-v1",
+  "summary": "Map monitoring page design context",
+  "issue": {
+    "provider": "gitea",
+    "repo": "example-org/flight-ops-console",
+    "number": 102,
+    "title": "Map monitoring page design context",
+    "targetDevIssues": [
+      {
+        "number": 101,
+        "title": "Implement map monitoring page"
+      }
+    ]
+  },
+  "source": {
+    "provider": "figma",
+    "adapter": "figma-mcp",
+    "fileKey": "demoFigmaFileKey",
+    "nodes": [
+      "1:23"
+    ],
+    "url": "https://www.figma.com/design/demoFigmaFileKey/Demo?node-id=1-23"
+  },
+  "frames": [
+    {
+      "id": "frame-map-monitoring-page",
+      "figmaNodeId": "1:23",
+      "name": "Map Monitoring Page",
+      "type": "FRAME",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "screenshot": "screenshots/main-frame.webp"
+    }
+  ],
+  "sections": [],
+  "dynamicRegions": [
+    {
+      "name": "Implementation-defined regions",
+      "rule": "implementation-defined",
+      "notes": "The center map uses the production map service. Treat the Figma map as an intent reference for control placement, visual balance, and overlay density."
+    }
+  ],
+  "assetsManifest": "normalized/assets.json",
+  "agentContext": "normalized/agent-context.md"
+}

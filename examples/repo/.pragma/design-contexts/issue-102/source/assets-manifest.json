@@ -1,0 +1,24 @@
+{
+  "assets": [
+    {
+      "id": "asset-drone-icon",
+      "name": "Drone marker icon",
+      "role": "map-marker",
+      "type": "svg",
+      "path": "icons/drone.svg",
+      "width": 32,
+      "height": 32,
+      "required": true
+    },
+    {
+      "id": "asset-panel-bg",
+      "name": "Panel background placeholder",
+      "role": "panel-background",
+      "type": "webp",
+      "path": "images/panel-bg.webp",
+      "width": 320,
+      "height": 180,
+      "required": false
+    }
+  ]
+}
