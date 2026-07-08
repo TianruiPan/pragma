@@ -1,0 +1,222 @@
+// src/bridge/dependency-lock.ts
+import { createHash } from "node:crypto";
+import { readdir, readFile } from "node:fs/promises";
+import path from "node:path";
+
+// src/shared/assets.ts
+function slugify(value, fallback = "item") {
+  const normalized = String(value || fallback).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return normalized || fallback;
+}
+function safeNodeIdSegment(value) {
+  return slugify(String(value).replace(/:/g, "-"), "node");
+}
+
+// src/bridge/dependency-lock.ts
+async function readJsonIfExists(filePath, fallback = void 0) {
+  try {
+    return JSON.parse(await readFile(filePath, "utf8"));
+  } catch {
+    return fallback;
+  }
+}
+async function readFileIfExists(filePath) {
+  try {
+    return await readFile(filePath);
+  } catch {
+    return null;
+  }
+}
+async function collectFileDigests(dirPath, prefix = "") {
+  let entries;
+  try {
+    entries = await readdir(dirPath);
+  } catch {
+    return [];
+  }
+  const records = [];
+  for (const entry of entries.sort()) {
+    const next = path.join(dirPath, entry);
+    const relative = prefix ? `${prefix}/${entry}` : entry;
+    try {
+      await readdir(next);
+      records.push(...await collectFileDigests(next, relative));
+    } catch {
+      const bytes = await readFileIfExists(next);
+      if (bytes) records.push({ path: relative, checksum: createHash("sha256").update(bytes).digest("hex") });
+    }
+  }
+  return records;
+}
+function stableJson(value) {
+  return JSON.stringify(value, (_key, item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return item;
+    return Object.fromEntries(Object.entries(item).sort(([left], [right]) => left.localeCompare(right)));
+  });
+}
+function frameIdsForRole(selection, role) {
+  const value = selection?.frames?.[role];
+  const frames = Array.isArray(value) ? value : value ? [value] : [];
+  return new Set(frames.map((frame) => String(frame.nodeId || frame.id)).filter(Boolean));
+}
+function nodeIdentity(node) {
+  return String(node?.figmaNodeId || node?.nodeId || node?.id || "");
+}
+function collectTreeNodeIds(nodes) {
+  const ids = /* @__PURE__ */ new Set();
+  const walk = (node) => {
+    const id = nodeIdentity(node);
+    if (id) ids.add(id);
+    if (Array.isArray(node?.children)) node.children.forEach(walk);
+  };
+  nodes.forEach(walk);
+  return ids;
+}
+function selectRoleLayerRoots(layers, role, frameIds) {
+  const roots = Array.isArray(layers?.nodes) ? layers.nodes : [];
+  const selected = roots.filter((node) => node?.role === role || frameIds.has(nodeIdentity(node)));
+  if (selected.length || role !== "page") return selected;
+  return roots.filter((node) => frameIds.has(nodeIdentity(node)));
+}
+async function contentHash(inputDir, role) {
+  const capture = await readJsonIfExists(path.join(inputDir, "capture.json"), {});
+  const selection = await readJsonIfExists(path.join(inputDir, "figma", "selection.json"), {});
+  const layers = await readJsonIfExists(path.join(inputDir, "figma", "layers.json"), {});
+  const components = await readJsonIfExists(path.join(inputDir, "figma", "components.json"), {});
+  const assetManifest = await readJsonIfExists(path.join(inputDir, "assets-manifest.json"), {});
+  const assetBindings = await readJsonIfExists(path.join(inputDir, "asset-bindings.json"), {});
+  const frameIds = frameIdsForRole(selection, role);
+  const selectedLayers = selectRoleLayerRoots(layers, role, frameIds);
+  const selectedNodeIds = collectTreeNodeIds(selectedLayers);
+  const roleFrames = Array.isArray(selection?.frames?.[role]) ? selection.frames[role] : selection?.frames?.[role] ? [selection.frames[role]] : [];
+  const payload = {
+    schemaVersion: "2.0",
+    role,
+    fileKey: capture?.figma?.fileKey || selection?.fileKey,
+    frames: roleFrames,
+    layers: selectedLayers
+  };
+  if (role === "components") {
+    payload.components = {
+      componentSets: components?.componentSets || components?.components || [],
+      codeConnect: components?.codeConnect || []
+    };
+  }
+  if (role === "assets") {
+    const relatedAssets = Array.isArray(assetManifest?.assets) ? assetManifest.assets.filter((asset) => {
+      const sourceIds = Array.isArray(asset?.sourceNodeIds) ? asset.sourceNodeIds.map(String) : [];
+      return asset?.role === "shared-assets-frame-export" || sourceIds.some((id) => selectedNodeIds.has(id));
+    }) : [];
+    payload.assets = relatedAssets;
+    payload.assetBindings = Array.isArray(assetBindings?.bindings) ? assetBindings.bindings.filter((binding) => selectedNodeIds.has(String(binding?.figmaNodeId || binding?.sourceNodeId || "")) || relatedAssets.some((asset) => asset.id === binding?.assetId)) : [];
+    payload.assetFiles = await collectFileDigests(path.join(inputDir, "assets"));
+  }
+  const full = createHash("sha256").update(stableJson(payload)).digest("hex");
+  return { checksum: `sha256:${full}`, short: full.slice(0, 12) };
+}
+function registryEntry(registry, role, snapshotId) {
+  if (!snapshotId) return void 0;
+  const entries = Array.isArray(registry?.roles?.[role]) ? registry.roles[role] : [];
+  return entries.find((entry) => entry.snapshotId === snapshotId) || { snapshotId };
+}
+function statusFromRegistry(input) {
+  const latest = input.registry?.latest?.[input.role];
+  const entry = registryEntry(input.registry, input.role, latest);
+  if (entry?.snapshotId) {
+    return {
+      status: "reused",
+      frameNodeId: entry.frameNodeId || null,
+      snapshotId: entry.snapshotId,
+      path: entry.path || `.pragma/design-sources/figma/${input.fileKey}/snapshots/${entry.snapshotId}`,
+      checksum: entry.checksum || null,
+      reason: "latest-shared-snapshot-from-repo-registry"
+    };
+  }
+  return {
+    status: input.hasBlockingRefs ? "missing" : "none",
+    frameNodeId: null,
+    snapshotId: null,
+    path: null,
+    checksum: null,
+    reason: input.hasBlockingRefs ? "no-selected-frame-and-no-reusable-registry-snapshot" : "no-selected-frame-and-no-detected-page-references"
+  };
+}
+function selectedStatus(input) {
+  const firstFrame = input.frames[0] || {};
+  const plannedSnapshotId = `${input.role}-${safeNodeIdSegment(firstFrame.nodeId || firstFrame.id || input.role)}-${input.hash.short}`;
+  return {
+    status: "selected",
+    frameNodeId: firstFrame.nodeId || firstFrame.id || null,
+    frameNodeIds: input.frames.map((frame) => frame.nodeId || frame.id).filter(Boolean),
+    snapshotId: null,
+    path: null,
+    checksum: null,
+    plannedSnapshotId,
+    contentChecksum: input.hash.checksum,
+    materializationStatus: "pending-preflight",
+    needsSourceSync: true,
+    reason: "selected-frame-needs-core-preflight-source-sync"
+  };
+}
+function selectedFrames(selection, role) {
+  const value = selection?.frames?.[role];
+  if (Array.isArray(value)) return value;
+  if (value) return [value];
+  return [];
+}
+function pageFrames(selection) {
+  return Array.isArray(selection?.frames?.page) ? selection.frames.page : [];
+}
+function hasComponentInstances(components, layers) {
+  if (Array.isArray(components?.instances) && components.instances.length > 0) return true;
+  const stack = Array.isArray(layers?.nodes) ? [...layers.nodes] : [];
+  while (stack.length) {
+    const node = stack.pop();
+    if (!node || typeof node !== "object") continue;
+    if (node.type === "INSTANCE" || node.componentRef) return true;
+    if (Array.isArray(node.children)) stack.push(...node.children);
+  }
+  return false;
+}
+function hasUnresolvedSharedAssetRefs(assetBindings) {
+  const bindings = Array.isArray(assetBindings?.bindings) ? assetBindings.bindings : [];
+  return bindings.some((binding) => binding.scope === "shared" || binding.unresolved === true);
+}
+async function buildDependencyLock(inputDir, repoLocalPath) {
+  const capture = await readJsonIfExists(path.join(inputDir, "capture.json"), {});
+  const selection = await readJsonIfExists(path.join(inputDir, "figma", "selection.json"), {});
+  const components = await readJsonIfExists(path.join(inputDir, "figma", "components.json"), {});
+  const layers = await readJsonIfExists(path.join(inputDir, "figma", "layers.json"), {});
+  const assetBindings = await readJsonIfExists(path.join(inputDir, "asset-bindings.json"), {});
+  const fileKey = capture?.figma?.fileKey || selection?.fileKey;
+  if (!fileKey || fileKey === "unknown-file-key") throw new Error("Figma fileKey is required before writing dependency-lock.json.");
+  const registryPath = repoLocalPath ? path.join(repoLocalPath, ".pragma", "design-sources", "figma", fileKey, "registry.json") : void 0;
+  const registry = registryPath ? await readJsonIfExists(registryPath, null) : null;
+  const componentsFrames = selectedFrames(selection, "components");
+  const assetsFrames = selectedFrames(selection, "assets");
+  const pageHash = await contentHash(inputDir, "page");
+  const componentsStatus = componentsFrames.length ? selectedStatus({ role: "components", frames: componentsFrames, fileKey, hash: await contentHash(inputDir, "components") }) : statusFromRegistry({ registry, role: "components", fileKey, hasBlockingRefs: hasComponentInstances(components, layers) });
+  const assetsStatus = assetsFrames.length ? selectedStatus({ role: "assets", frames: assetsFrames, fileKey, hash: await contentHash(inputDir, "assets") }) : statusFromRegistry({ registry, role: "assets", fileKey, hasBlockingRefs: hasUnresolvedSharedAssetRefs(assetBindings) });
+  return {
+    schemaVersion: "2.0",
+    kind: "pragma-design-dependencies",
+    fileKey,
+    capturedAt: capture.capturedAt || (/* @__PURE__ */ new Date()).toISOString(),
+    pageFrames: pageFrames(selection).map((frame) => ({
+      nodeId: frame.nodeId || frame.id,
+      name: frame.name,
+      snapshotId: `page-${safeNodeIdSegment(frame.nodeId || frame.id)}-${pageHash.short}`
+    })),
+    components: componentsStatus,
+    assets: assetsStatus,
+    rules: {
+      lockDependencies: true,
+      neverDependOnFloatingLatest: true,
+      ifMissingComponentsAndPageHasInstances: "block",
+      ifMissingAssetsAndPageHasUnresolvedRefs: "block"
+    }
+  };
+}
+export {
+  buildDependencyLock
+};

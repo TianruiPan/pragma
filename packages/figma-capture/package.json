@@ -1,0 +1,24 @@
+{
+  "name": "@pragma/figma-capture",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pragma 2.0 Figma Plugin and local Capture Bridge MVP.",
+  "bin": {
+    "pragma-figma-capture-bridge": "./dist/bridge/cli.js"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "bridge": "node dist/bridge/cli.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "esbuild": "^0.28.1",
+    "typescript": "^5.7.3"
+  }
+}

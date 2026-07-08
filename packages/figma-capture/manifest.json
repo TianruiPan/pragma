@@ -1,0 +1,17 @@
+{
+  "name": "Pragma Capture Bridge",
+  "id": "pragma-capture-bridge-dev",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "editorType": ["figma"],
+  "enablePrivatePluginApi": true,
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["none"],
+    "reasoning": "Development-only local bridge for explicit designer-selected Pragma capture bundles.",
+    "devAllowedDomains": [
+      "http://localhost:48732"
+    ]
+  }
+}

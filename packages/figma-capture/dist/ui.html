@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --background: #09090b;
+      --card: #18181b;
+      --popover: #111113;
+      --border: #27272a;
+      --input: #27272a;
+      --foreground: #fafafa;
+      --muted: #a1a1aa;
+      --muted-2: #71717a;
+      --primary: #fafafa;
+      --primary-foreground: #09090b;
+      --destructive: #ef4444;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--foreground);
+      background: var(--background);
+      font-size: 12px;
+    }
+    header { padding: 18px 18px 8px; border-bottom: 1px solid var(--border); }
+    h1 { margin: 0; font-size: 18px; font-weight: 500; letter-spacing: -0.02em; }
+    .sub { margin-top: 6px; color: var(--muted); line-height: 1.5; }
+    main { padding: 12px 18px 18px; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin: 10px 0; }
+    h2 { margin: 0 0 8px; font-size: 13px; font-weight: 500; letter-spacing: -0.01em; }
+    label { display: block; color: var(--muted); margin: 10px 0 5px; font-size: 12px; }
+    input, textarea {
+      width: 100%; border: 1px solid var(--input); border-radius: 8px; padding: 8px 9px;
+      background: var(--background); color: var(--foreground); font: inherit; outline: none;
+    }
+    input:focus, textarea:focus { border-color: #52525b; }
+    textarea { min-height: 54px; resize: vertical; }
+    button {
+      border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font: inherit;
+      cursor: pointer; background: var(--primary); color: var(--primary-foreground);
+    }
+    button.secondary { background: var(--popover); color: var(--foreground); }
+    button.ghost { background: transparent; color: var(--muted); }
+    button.danger { color: var(--destructive); background: transparent; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .muted { color: var(--muted); }
+    .tiny { color: var(--muted-2); font-size: 11px; line-height: 1.45; }
+    .hint { border: 1px solid var(--border); border-radius: 8px; padding: 8px; color: var(--muted); background: var(--popover); line-height: 1.5; margin-bottom: 10px; }
+    .selection-list, .slot-list { display: grid; gap: 8px; }
+    .node-card {
+      border: 1px solid var(--border); border-radius: 8px; padding: 8px;
+      background: var(--popover); min-width: 0;
+    }
+    .node-top { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+    .node-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
+    .node-meta { color: var(--muted-2); margin-top: 3px; }
+    .url { color: var(--muted); margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .slot-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .count { color: var(--muted-2); font-size: 11px; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .status { color: var(--muted); line-height: 1.5; white-space: pre-wrap; }
+    .error { color: var(--destructive); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Pragma Capture</h1>
+    <div class="sub">Add the current Figma selection into persistent frame slots. Switching selection will not clear slots.</div>
+  </header>
+  <main>
+    <section>
+      <div class="slot-header">
+        <h2>Current selection</h2>
+        <button class="secondary" id="refresh">Refresh</button>
+      </div>
+      <div id="selection" class="selection-list"></div>
+      <div class="actions">
+        <button id="addPage">Add to page</button>
+        <button class="secondary" id="addComponents">Add to components</button>
+        <button class="secondary" id="addAssets">Add to assets</button>
+      </div>
+    </section>
+
+    <section>
+      <div class="hint">
+        Required: at least one page frame, a design issue number, and a file key from the Figma URL or override. Send to local bridge also requires <span class="muted">http://localhost:48732/capture</span> and a running bridge process.
+      </div>
+      <div class="grid">
+        <div><label>Repo owner</label><input id="repoOwner" value="local" /></div>
+        <div><label>Repo name</label><input id="repoName" value="product-repo" /></div>
+      </div>
+      <label>Repo local path</label><input id="repoLocalPath" placeholder="D:/path/to/repo" />
+      <div class="grid">
+        <div><label>Design issue number</label><input id="designIssueNumber" type="number" min="1" value="1" /></div>
+        <div><label>Target dev issue number</label><input id="targetDevIssueNumber" type="number" min="1" /></div>
+      </div>
+      <label>Figma URL or file URL</label><input id="figmaUrl" placeholder="https://www.figma.com/design/...?...node-id=..." />
+      <label>File key override</label><input id="fileKey" placeholder="Auto-filled when Figma exposes fileKey" />
+      <label>Designer notes</label><textarea id="designerNotes" placeholder="Intent, priorities, implementation boundaries"></textarea>
+      <label>Dynamic region notes</label><textarea id="dynamicRegionNotes" placeholder="Maps, charts, video, 3D, realtime data"></textarea>
+      <label>Bridge URL</label><input id="bridgeUrl" value="http://localhost:48732/capture" />
+    </section>
+
+    <section id="slots"></section>
+
+    <section>
+      <div class="row">
+        <button id="export">Export capture</button>
+        <button class="secondary" id="send">Send to local bridge</button>
+        <button class="ghost" id="clearAll">Clear slots</button>
+      </div>
+    </section>
+
+    <section><div id="status" class="status">Waiting for selection...</div></section>
+  </main>
+  <script>
+    const state = {
+      selection: [],
+      slots: { page: [], components: [], assets: [] },
+      fileKeyFromFigma: ""
+    };
+    const $ = (id) => document.getElementById(id);
+    const fields = ["repoOwner", "repoName", "repoLocalPath", "designIssueNumber", "targetDevIssueNumber", "figmaUrl", "fileKey", "designerNotes", "dynamicRegionNotes"];
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+    }
+
+    function setStatus(text, isError = false) {
+      const node = $("status");
+      node.textContent = typeof text === "string" ? text : JSON.stringify(text, null, 2);
+      node.className = isError ? "status error" : "status";
+    }
+
+    function parseFileKeyFromUrl(value) {
+      try {
+        const url = new URL(value);
+        const parts = url.pathname.split("/").filter(Boolean);
+        const known = ["design", "file", "proto", "board", "slides", "make"];
+        const index = parts.findIndex((part) => known.includes(part));
+        const branch = parts.indexOf("branch");
+        if (branch >= 0 && parts[branch + 1]) return parts[branch + 1];
+        if (index >= 0 && parts[index + 1]) return parts[index + 1];
+      } catch {}
+      return "";
+    }
+
+    function currentFileKey() {
+      return $("fileKey").value.trim() || parseFileKeyFromUrl($("figmaUrl").value.trim()) || state.fileKeyFromFigma || "";
+    }
+
+    function normalizeBridgeUrl(value) {
+      const input = String(value || "http://localhost:48732/capture").trim();
+      const withProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(input) ? input : `http://${input}`;
+      const withoutHash = withProtocol.split("#")[0];
+      const withoutQuery = withoutHash.split("?")[0];
+      const normalized = withoutQuery.endsWith("/") ? withoutQuery.slice(0, -1) : withoutQuery;
+      if (normalized === "http://localhost:48732") return "http://localhost:48732/capture";
+      if (normalized === "http://localhost:48732/capture") return "http://localhost:48732/capture";
+      return "";
+    }
+
+    function frameUrl(node) {
+      const key = currentFileKey();
+      if (!key) return "";
+      return `https://www.figma.com/design/${encodeURIComponent(key)}/Pragma-Capture?node-id=${String(node.id).replace(/:/g, "-")}`;
+    }
+
+    function nodeCard(node, role) {
+      const url = frameUrl(node);
+      const size = node.width ? `${Math.round(node.width)}x${Math.round(node.height)}` : "size unknown";
+      return `
+        <div class="node-card" data-node-id="${escapeHtml(node.id)}">
+          <div class="node-top">
+            <div style="min-width:0">
+              <div class="node-title" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</div>
+              <div class="node-meta">${escapeHtml(node.type)} - ${escapeHtml(node.id)} - ${size}</div>
+            </div>
+            ${role ? `<button class="danger" data-remove-role="${role}" data-remove-id="${escapeHtml(node.id)}">Remove</button>` : ""}
+          </div>
+          <div class="url">${url ? escapeHtml(url) : "Enter a file key or Figma URL to generate this frame URL."}</div>
+        </div>`;
+    }
+
+    function renderSelection() {
+      const mount = $("selection");
+      if (!state.selection.length) {
+        mount.innerHTML = '<div class="tiny">Select one or more frames in Figma, then click Refresh or change selection.</div>';
+        return;
+      }
+      mount.innerHTML = state.selection.map((node) => nodeCard(node)).join("");
+    }
+
+    function renderSlots() {
+      const labels = { page: "Page frames", components: "Component frames", assets: "Asset frames" };
+      $("slots").innerHTML = ["page", "components", "assets"].map((role) => `
+        <div class="slot-block" style="margin-bottom:12px">
+          <div class="slot-header">
+            <h2>${labels[role]}</h2>
+            <span class="count">${state.slots[role].length} selected</span>
+          </div>
+          <div class="slot-list">${state.slots[role].length ? state.slots[role].map((node) => nodeCard(node, role)).join("") : '<div class="tiny">No frames in this slot.</div>'}</div>
+        </div>`).join("");
+      for (const button of document.querySelectorAll("[data-remove-role]")) {
+        button.addEventListener("click", () => {
+          const role = button.getAttribute("data-remove-role");
+          const id = button.getAttribute("data-remove-id");
+          state.slots[role] = state.slots[role].filter((node) => node.id !== id);
+          renderSlots();
+        });
+      }
+    }
+
+    function addSelection(role) {
+      if (!state.selection.length) {
+        setStatus("Select at least one frame in Figma first.", true);
+        return;
+      }
+      const selectedIds = new Set(state.selection.map((node) => node.id));
+      for (const otherRole of ["page", "components", "assets"]) {
+        if (otherRole !== role) state.slots[otherRole] = state.slots[otherRole].filter((node) => !selectedIds.has(node.id));
+      }
+      const existing = new Set(state.slots[role].map((node) => node.id));
+      for (const node of state.selection) {
+        if (!existing.has(node.id)) state.slots[role].push(node);
+      }
+      renderSlots();
+      setStatus(`Added ${state.selection.length} current selection item(s) to ${role}.`);
+    }
+
+    function collectRequest() {
+      if (!state.slots.page.length) throw new Error("Add at least one frame to the page slot before exporting.");
+      const request = {
+        frameSlots: {
+          page: state.slots.page.map((node) => node.id),
+          components: state.slots.components.map((node) => node.id),
+          assets: state.slots.assets.map((node) => node.id)
+        }
+      };
+      for (const field of fields) request[field] = $(field).value.trim();
+      if (!request.fileKey) request.fileKey = currentFileKey();
+      if (!request.fileKey) throw new Error("Figma fileKey is required. Paste the Figma file URL or fill File key override.");
+      request.designIssueNumber = Number(request.designIssueNumber || 1);
+      if (!Number.isInteger(request.designIssueNumber) || request.designIssueNumber <= 0) throw new Error("Design issue number must be a positive integer.");
+      request.targetDevIssueNumber = request.targetDevIssueNumber ? Number(request.targetDevIssueNumber) : undefined;
+      return request;
+    }
+
+    function post(type, extra = {}) {
+      parent.postMessage({ pluginMessage: { type, ...extra } }, "*");
+    }
+
+    $("refresh").onclick = () => post("refresh-selection");
+    $("addPage").onclick = () => addSelection("page");
+    $("addComponents").onclick = () => addSelection("components");
+    $("addAssets").onclick = () => addSelection("assets");
+    $("clearAll").onclick = () => { state.slots = { page: [], components: [], assets: [] }; renderSlots(); setStatus("Cleared all slots."); };
+    $("figmaUrl").addEventListener("input", () => renderSlots());
+    $("fileKey").addEventListener("input", () => renderSlots());
+
+    $("export").onclick = () => {
+      try {
+        setStatus("Building capture bundle...");
+        post("export-capture", { request: collectRequest() });
+      } catch (error) { setStatus(error.message, true); }
+    };
+    $("send").onclick = () => {
+      try {
+        const bridgeUrl = normalizeBridgeUrl($("bridgeUrl").value);
+        if (!bridgeUrl) throw new Error("Bridge URL must be exactly http://localhost:48732/capture.");
+        $("bridgeUrl").value = bridgeUrl;
+        setStatus("Sending capture bundle to local bridge...");
+        post("send-to-bridge", { request: collectRequest(), bridgeUrl });
+      } catch (error) { setStatus(error.message, true); }
+    };
+
+    onmessage = (event) => {
+      const message = event.data.pluginMessage;
+      if (!message) return;
+      if (message.type === "selection") {
+        state.selection = message.selection || [];
+        state.fileKeyFromFigma = message.fileKey || state.fileKeyFromFigma || "";
+        if (state.fileKeyFromFigma && !$("fileKey").value.trim()) $("fileKey").value = state.fileKeyFromFigma;
+        renderSelection();
+        renderSlots();
+        setStatus(`${state.selection.length} selected node(s). Add them into a slot when ready.`);
+      }
+      if (message.type === "export-ready") {
+        const blob = new Blob([JSON.stringify(message.bundle, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `pragma-input-bundle-${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setStatus(`Capture bundle downloaded. Files: ${message.bundle.files.length}`);
+      }
+      if (message.type === "bridge-result") setStatus(JSON.stringify(message.bridgeResult, null, 2));
+      if (message.type === "error") setStatus(message.message, true);
+    };
+
+    renderSelection();
+    renderSlots();
+  </script>
+</body>
+</html>
