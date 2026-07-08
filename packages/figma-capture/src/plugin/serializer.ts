@@ -1,7 +1,7 @@
 import { createAssetRecord, extensionForMime, safeNodeIdSegment, sniffAssetBytes, slugify } from "../shared/assets.js";
 import { binaryFile, createPragmaInputBundle, jsonFile, textFile } from "../shared/bundle.js";
 import { buildFigmaUrl, parseFigmaUrl, resolveRequiredFigmaFileKey } from "../shared/figma-url.js";
-import { collectComponentInstances, flattenSerializedLayers, serializeLayerNode } from "../shared/layer.js";
+import { availableStatesFromProperties, collectComponentInstances, collectVisualStateSources, flattenSerializedLayers, plain, serializeLayerNode } from "../shared/layer.js";
 import { buildCaptureJson, buildPluginOnlyDependencyLock, buildSelectionJson } from "../shared/roles.js";
 import type { BundleFile, CaptureFrame, CaptureFrames, CaptureRequest, FrameRole, RectLike } from "../shared/types.js";
 
@@ -81,12 +81,15 @@ async function resolveAssignedFrames(rawRequest: any): Promise<Record<FrameRole,
 }
 
 function frameFromNode(node: any, role: FrameRole, fileKey: string): CaptureFrame {
+  const bounds = placementOf(node);
   return {
     nodeId: node.id,
     name: node.name,
     type: node.type,
     width: node.width,
     height: node.height,
+    bounds,
+    viewport: { width: node.width || bounds.width || 0, height: node.height || bounds.height || 0 },
     role,
     optional: role !== "page",
     url: buildFigmaUrl(fileKey, node.id)
@@ -116,12 +119,18 @@ function plainFigmaNode(node: any): Record<string, unknown> {
     "id", "name", "type", "visible", "locked", "opacity", "blendMode",
     "absoluteBoundingBox", "relativeTransform", "width", "height",
     "constraints", "layoutMode", "primaryAxisSizingMode", "counterAxisSizingMode",
-    "primaryAxisAlignItems", "counterAxisAlignItems", "itemSpacing",
+    "primaryAxisAlignItems", "counterAxisAlignItems", "layoutWrap", "itemSpacing",
+    "layoutGrow", "layoutAlign", "layoutPositioning", "layoutSizingHorizontal", "layoutSizingVertical",
+    "itemReverseZIndex", "strokesIncludedInLayout", "clipsContent", "overflowDirection",
+    "minWidth", "maxWidth", "minHeight", "maxHeight",
+    "inferredAutoLayout", "explicitVariableModes", "resolvedVariableModes",
     "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
     "fills", "strokes", "strokeWeight", "cornerRadius", "rectangleCornerRadii",
     "effects", "characters", "fontName", "fontSize", "fontWeight",
     "lineHeight", "letterSpacing", "textAlignHorizontal", "textAlignVertical",
-    "componentProperties", "variantProperties", "boundVariables"
+    "componentProperties", "variantProperties", "boundVariables",
+    "fillStyleId", "strokeStyleId", "textStyleId", "effectStyleId", "gridStyleId",
+    "key", "description", "componentPropertyDefinitions", "exportSettings"
   ];
   const output: Record<string, unknown> = {};
   for (const key of keys) {
@@ -131,17 +140,21 @@ function plainFigmaNode(node: any): Record<string, unknown> {
       // Some Figma getters throw when data is mixed/unloaded; omit those facts.
     }
   }
+  output.parentId = node.parent?.id;
+  output.parentName = node.parent?.name;
+  output.pageId = figma.currentPage?.id;
+  output.pageName = figma.currentPage?.name;
   output.children = [];
   return output;
 }
 
-async function serializeFigmaNode(node: any, role: FrameRole, zIndex = 0): Promise<any> {
+async function serializeFigmaNode(node: any, role: FrameRole, zIndex = 0, parentNodeId?: string): Promise<any> {
   const mainComponent = await mainComponentOf(node);
   const childNodes = Array.isArray(node.children) ? node.children : [];
-  const serialized = serializeLayerNode(plainFigmaNode(node), { role, zIndex, mainComponent });
+  const serialized = serializeLayerNode(plainFigmaNode(node), { role, zIndex, mainComponent, parentNodeId });
   serialized.children = [];
   for (let index = 0; index < childNodes.length; index += 1) {
-    serialized.children.push(await serializeFigmaNode(childNodes[index], role, index));
+    serialized.children.push(await serializeFigmaNode(childNodes[index], role, index, node.id));
   }
   return serialized;
 }
@@ -161,23 +174,94 @@ async function serializeLayerRoots(roles: Record<FrameRole, any[]>) {
   };
 }
 
+function componentSource(node: any) {
+  return node.role === "components" ? "selected-components-frame" : "page-inline";
+}
+
+function componentMetadataFromLayer(node: any) {
+  return {
+    id: node.nodeId,
+    nodeId: node.figmaNodeId,
+    figmaNodeId: node.figmaNodeId,
+    parentNodeId: node.parentNodeId,
+    name: node.name,
+    type: node.type,
+    role: node.role,
+    source: componentSource(node),
+    size: node.size,
+    visible: node.visible,
+    hidden: node.hidden,
+    locked: node.locked,
+    componentRef: node.componentRef,
+    componentSetId: node.type === "COMPONENT" ? node.parentNodeId || node.componentRef?.componentSetId : node.componentRef?.componentSetId,
+    componentProperties: node.componentProperties || {},
+    variantProperties: node.variantProperties || {},
+    componentPropertyDefinitions: node.componentPropertyDefinitions || {},
+    availableStates: node.availableStates?.length
+      ? node.availableStates
+      : availableStatesFromProperties({
+        variantProperties: node.variantProperties,
+        componentProperties: node.componentProperties,
+        componentPropertyDefinitions: node.componentPropertyDefinitions,
+        visible: node.visible
+      })
+  };
+}
+
+function countVisibilityFacts(nodes: any[]) {
+  return nodes.filter((node) => typeof node.visible === "boolean" || typeof node.hidden === "boolean").length;
+}
+
+function styleRecord(style: any) {
+  return {
+    id: style.id,
+    key: style.key,
+    name: style.name,
+    type: style.type,
+    description: style.description,
+    remote: style.remote,
+    paints: plain(style.paints),
+    typeStyle: plain(style.typeStyle),
+    effects: plain(style.effects),
+    layoutGrids: plain(style.layoutGrids),
+    documentationLinks: plain(style.documentationLinks)
+  };
+}
+
 function buildComponentsJson(layerTree: any) {
+  const allLayers = flattenSerializedLayers(layerTree.nodes || []);
   const instances = collectComponentInstances(layerTree.nodes || []);
-  const componentSets = flattenSerializedLayers(layerTree.nodes || [])
-    .filter((node) => node.type === "COMPONENT_SET" || node.type === "COMPONENT")
+  const visualStateSources = collectVisualStateSources(layerTree.nodes || []);
+  const stateFrames = visualStateSources.filter((state) => state.type === "FRAME" || state.type === "SECTION");
+  const componentSets = allLayers
+    .filter((node) => node.type === "COMPONENT_SET")
     .map((node) => ({
-      id: node.nodeId,
-      nodeId: node.figmaNodeId,
-      name: node.name,
-      type: node.type,
-      source: node.role === "components" ? "selected-components-frame" : "page-inline",
-      variants: []
+      ...componentMetadataFromLayer(node),
+      components: allLayers
+        .filter((candidate) => candidate.type === "COMPONENT" && candidate.parentNodeId === node.figmaNodeId)
+        .map(componentMetadataFromLayer)
     }));
+  const components = allLayers
+    .filter((node) => node.type === "COMPONENT")
+    .map(componentMetadataFromLayer);
+  const componentMetadataMissingCount = instances.filter((instance: any) => !instance.mainComponentNodeId).length;
   return {
     schemaVersion: "2.0",
     kind: "pragma-components",
     instances,
+    components,
     componentSets,
+    visualStateSources,
+    stateFrames,
+    metadataCompleteness: {
+      instanceCount: instances.length,
+      componentCount: components.length,
+      componentSetCount: componentSets.length,
+      visualStateSourceCount: visualStateSources.length,
+      stateFrameCount: stateFrames.length,
+      componentMetadataMissingCount,
+      visibilityFactsCount: countVisibilityFacts(allLayers)
+    },
     codeConnect: []
   };
 }
@@ -197,7 +281,10 @@ async function buildVariablesJson() {
         name: variable.name,
         resolvedType: variable.resolvedType,
         variableCollectionId: variable.variableCollectionId,
-        valuesByMode: variable.valuesByMode
+        valuesByMode: variable.valuesByMode,
+        scopes: variable.scopes,
+        description: variable.description,
+        remote: variable.remote
       }));
     }
   } catch (error) {
@@ -207,12 +294,99 @@ async function buildVariablesJson() {
     if (figma.getLocalPaintStylesAsync) {
       const paints = await figma.getLocalPaintStylesAsync();
       const texts = figma.getLocalTextStylesAsync ? await figma.getLocalTextStylesAsync() : [];
-      result.styles = [...paints, ...texts].map((style: any) => ({ id: style.id, key: style.key, name: style.name, type: style.type, description: style.description }));
+      const effects = figma.getLocalEffectStylesAsync ? await figma.getLocalEffectStylesAsync() : [];
+      const grids = figma.getLocalGridStylesAsync ? await figma.getLocalGridStylesAsync() : [];
+      result.styles = [...paints, ...texts, ...effects, ...grids].map(styleRecord);
+      result.styleSummary = {
+        paintCount: paints.length,
+        textCount: texts.length,
+        effectCount: effects.length,
+        gridCount: grids.length
+      };
     }
   } catch (error) {
     result.stylesError = error instanceof Error ? error.message : String(error);
   }
   return result;
+}
+
+function buildMetadataJson(input: {
+  request: CaptureRequest;
+  frames: CaptureFrames;
+  layerTree: any;
+  components: any;
+  capturedAt: string;
+}) {
+  const allLayers = flattenSerializedLayers(input.layerTree.nodes || []);
+  const capturedFrames = (["page", "components", "assets"] as FrameRole[])
+    .flatMap((role) => (input.frames[role] || []).map((frame) => ({
+      nodeId: frame.nodeId,
+      name: frame.name,
+      type: frame.type,
+      role,
+      width: frame.width,
+      height: frame.height,
+      size: { width: frame.width || 0, height: frame.height || 0 },
+      bounds: frame.bounds,
+      viewport: frame.viewport,
+      optional: frame.optional,
+      url: frame.url
+    })));
+  const visibilityFacts = {
+    total: allLayers.filter((node) => typeof node.visible === "boolean" || typeof node.hidden === "boolean").length,
+    visible: allLayers.filter((node) => node.visible === true).length,
+    hidden: allLayers.filter((node) => node.hidden === true).length
+  };
+  const nodeFacts = allLayers.map((node) => ({
+    nodeId: node.nodeId,
+    figmaNodeId: node.figmaNodeId,
+    parentNodeId: node.parentNodeId,
+    name: node.name,
+    type: node.type,
+    role: node.role,
+    size: node.size,
+    bounds: node.bounds,
+    sourceOrder: node.sourceOrder,
+    visible: node.visible,
+    hidden: node.hidden,
+    locked: node.locked,
+    componentRef: node.componentRef,
+    componentProperties: node.componentProperties,
+    variantProperties: node.variantProperties,
+    availableStates: node.availableStates,
+    styleIds: node.styleIds,
+    tokenRefs: node.tokenRefs
+  }));
+  return {
+    schemaVersion: "2.0",
+    kind: "pragma-figma-metadata",
+    fileKey: input.request.figma.fileKey,
+    fileName: input.request.figma.fileName,
+    capturedAt: input.capturedAt,
+    document: {
+      fileKey: input.request.figma.fileKey,
+      fileName: input.request.figma.fileName,
+      editorType: figma.editorType,
+      updatedAt: (figma.root as any)?.lastModified || (figma.root as any)?.updatedAt || null,
+      updatedAtStatus: (figma.root as any)?.lastModified || (figma.root as any)?.updatedAt ? "captured" : "unavailable-in-plugin-api"
+    },
+    currentPage: {
+      id: figma.currentPage.id,
+      name: figma.currentPage.name,
+      type: figma.currentPage.type,
+      childCount: Array.isArray(figma.currentPage.children) ? figma.currentPage.children.length : undefined
+    },
+    capturedFrames,
+    frameRoles: input.frames,
+    nodeFacts,
+    visibilityFacts,
+    componentMetadataSummary: input.components.metadataCompleteness || {
+      instanceCount: input.components.instances?.length || 0,
+      componentCount: input.components.components?.length || 0,
+      componentSetCount: input.components.componentSets?.length || 0
+    },
+    source: { provider: "figma", adapter: "figma-plugin-capture-bridge" }
+  };
 }
 
 async function exportNodePng(node: any): Promise<Uint8Array> {
@@ -237,6 +411,21 @@ function placementOf(node: any): RectLike {
 
 function imagePaints(node: any) {
   return Array.isArray(node.fills) ? node.fills.filter((fill: any) => fill && fill.type === "IMAGE" && fill.imageHash) : [];
+}
+
+function fitForImagePaint(fill: any) {
+  if (fill.scaleMode === "FILL") return "cover";
+  if (fill.scaleMode === "STRETCH") return "stretch";
+  if (fill.scaleMode === "TILE") return "tile";
+  return "contain";
+}
+
+function cropForImagePaint(fill: any) {
+  if (fill.scaleMode !== "CROP") return null;
+  return {
+    scaleMode: fill.scaleMode,
+    imageTransform: plain(fill.imageTransform) ?? null
+  };
 }
 
 function walkNodes(nodes: any[], visit: (node: any) => void) {
@@ -268,10 +457,15 @@ async function addImageFillAssets(files: BundleFile[], assetRecords: any[], bind
     const assetPath = `assets/images/${assetId}.${ext}`;
     const binding = {
       assetId,
+      nodeId: node.id,
       figmaNodeId: node.id,
-      fit: fill.scaleMode === "FILL" ? "cover" : "contain",
-      crop: null,
-      placement: placementOf(node)
+      sourceNodeIds: [node.id],
+      usedByNodeIds: [node.id],
+      scope: "page" as const,
+      fit: fitForImagePaint(fill),
+      crop: cropForImagePaint(fill),
+      placement: placementOf(node),
+      sourcePaint: plain(fill)
     };
     bindings.push(binding);
     assetRecords.push(createAssetRecord({
@@ -285,6 +479,7 @@ async function addImageFillAssets(files: BundleFile[], assetRecords: any[], bind
       checksum,
       checksumStatus: checksum ? undefined : "unavailable",
       sourceNodeIds: [node.id],
+      usedByNodeIds: [node.id],
       bindings: [binding],
       required: true
     }));
@@ -304,7 +499,11 @@ async function addAssetsFrameExports(files: BundleFile[], assetRecords: any[], b
     const assetPath = `assets/exports/${assetId}.png`;
     const binding = {
       assetId,
+      nodeId: node.id,
       figmaNodeId: node.id,
+      sourceNodeIds: [node.id],
+      usedByNodeIds: [node.id],
+      scope: "shared" as const,
       fit: "contain",
       crop: null,
       placement: placementOf(node)
@@ -321,6 +520,7 @@ async function addAssetsFrameExports(files: BundleFile[], assetRecords: any[], b
       checksum,
       checksumStatus: checksum ? undefined : "unavailable",
       sourceNodeIds: [node.id],
+      usedByNodeIds: [node.id],
       bindings: [binding],
       required: false
     }));
@@ -409,16 +609,7 @@ export async function buildCaptureBundle(rawRequest: any) {
     hasComponentInstances,
     hasUnresolvedSharedAssetRefs: false
   });
-  const metadata = {
-    schemaVersion: "2.0",
-    kind: "pragma-figma-metadata",
-    fileKey: request.figma.fileKey,
-    fileName: request.figma.fileName,
-    capturedAt,
-    currentPage: { id: figma.currentPage.id, name: figma.currentPage.name, type: figma.currentPage.type },
-    frameRoles: frames,
-    source: { provider: "figma", adapter: "figma-plugin-capture-bridge" }
-  };
+  const metadata = buildMetadataJson({ request, frames, layerTree, components, capturedAt });
 
   files.push(jsonFile("capture.json", capture));
   files.push(jsonFile("dependency-lock.json", dependencyLock));

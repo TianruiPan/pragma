@@ -80,12 +80,16 @@ pragma-input/
 ## Core Handoff Fields
 
 - `capture.json.figma.frames`: explicit page/components/assets role selection.
-- `figma/selection.json.frames.*[].url`: generated per-frame Figma URLs when a fileKey is available.
+- `figma/selection.json.frames.*[]`: generated per-frame Figma URLs plus role, nodeId, name, bounds, and viewport when a fileKey is available.
 - `dependency-lock.json`: bridge-resolved snapshot dependency status; reused entries are concrete, while selected components/assets include `frameNodeIds` and `needsSourceSync: true` for core `preflight --fix`.
-- `figma/layers.json`: provider facts for node tree, bounds, styles, text, layout, component refs, and image fill refs.
-- `figma/components.json.instances`: page component instance facts with bounds and component refs.
-- `assets-manifest.json` + `asset-bindings.json`: page-bound and selected asset-frame exports with MIME/path/node bindings; asset width/height are sniffed from exported files, while placement size stays in bindings.
-- `capture-summary.json`: bridge-written capture timings and diagnostics, including `serializeMs`, `exportScreenshotsMs`, `exportAssetsMs`, `writeFilesMs`, `dependencyLockMs`, `totalMs`, frame role counts, unavailable checksums, unresolved shared refs, and pending preflight dependencies.
+- `figma/metadata.json`: selected-file/page/frame/node native facts, including fileKey, fileName, page metadata, selected frame size/URL, visibility counts, component metadata completeness, and style/variable refs.
+- `figma/layers.json`: provider facts for node tree, source order, bounds, size, styles/styleIds/boundVariables, text typography/color, layout/constraints, visibility/hidden, component refs/properties/variants, and image fill refs.
+- `figma/variables.json`: local Figma variables and styles with ids/keys/names/types and source payloads such as paints, typeStyle, effects, and grids when the Plugin API exposes them.
+- `figma/components.json`: page component instances plus selected component-frame component sets/components, mainComponent/componentSet refs, variant properties, component properties, visualStateSources/stateFrames, available Figma-native states, and metadata completeness.
+- `assets-manifest.json` + `asset-bindings.json`: page-bound and selected asset-frame exports with MIME/path/node bindings; asset width/height are sniffed from exported files, while fit/crop/placement/sourcePaint/sourceNodeIds/usedByNodeIds stay in `asset-bindings.json` binding records.
+- `capture-summary.json`: bridge-written capture timings and diagnostics, including `serializeMs`, `exportScreenshotsMs`, `exportAssetsMs`, `writeFilesMs`, `dependencyLockMs`, `totalMs`, frame role counts, component metadata missing count, visibility facts count, style/variable ref counts, unavailable checksums, unresolved shared refs, and pending preflight dependencies.
+
+The plugin does not output Pragma `pageRegions` or normalized `pixel-spec/` shards. It only captures Figma-native machine facts; Pragma core owns page region generation, pixel-spec sharding, and any business runtime state interpretation.
 
 Example bridge response fields:
 
@@ -103,6 +107,13 @@ Example bridge response fields:
   },
   "diagnostics": {
     "assetChecksumUnavailableCount": 1,
+    "componentMetadataMissingCount": 0,
+    "visibilityFactsCount": 42,
+    "styleRefNodeCount": 12,
+    "variableRefNodeCount": 8,
+    "localVariableCount": 24,
+    "localStyleCount": 18,
+    "assetBindingCount": 3,
     "unresolvedSharedRefCount": 0,
     "dynamicRegionNotesMissing": true,
     "selectedPendingPreflight": []
@@ -126,6 +137,8 @@ Structured bridge errors use this shape:
 - The plugin cannot call Figma MCP `get_design_context`; it writes an explicit plugin summary instead of fabricating MCP output.
 - Plugin-only export cannot inspect repo `.pragma/design-sources`; local bridge or Pragma core must resolve `reused` snapshots.
 - Export/send blocks if fileKey cannot be resolved from override, Figma URL, or `figma.fileKey`.
+- Figma Plugin API does not reliably expose file `updatedAt`, remote library variable/style definitions, Code Connect mappings, prototype interactions, or pluginData/sharedPluginData in this MVP path; missing facts are marked unavailable or omitted instead of being invented.
+- Style/variable ids are source refs, not guaranteed Pragma token ids. Core should map `styleIds`/`boundVariables` to `tokenId + resolvedValue` when registry data exists and warn when no token mapping is available.
 - If WebCrypto is unavailable, plugin assets omit `checksum` and write `checksumStatus: "unavailable"`; Pragma core `preflight --fix` recomputes the real sha256.
 - Image fill bytes are captured when Figma exposes `getImageByHash`; other complex export settings may need manual asset-frame selection.
 - MIME sniffing is best-effort in-plugin; Pragma core validation should remain authoritative.

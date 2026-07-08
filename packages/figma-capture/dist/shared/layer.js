@@ -23,6 +23,84 @@ function plain(value, depth = 0) {
   }
   return void 0;
 }
+function plainRecord(value) {
+  const normalized = plain(value);
+  return normalized && typeof normalized === "object" && !Array.isArray(normalized) ? normalized : void 0;
+}
+function stringOrUndefined(value) {
+  const text = String(value || "");
+  return text ? text : void 0;
+}
+function visibleOf(node) {
+  return node.visible === void 0 ? true : Boolean(node.visible);
+}
+function colorByte(value) {
+  return Math.max(0, Math.min(255, Math.round(numberOr(value, 0) * 255)));
+}
+function colorHex(color) {
+  return `#${["r", "g", "b"].map((key) => colorByte(color[key]).toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+}
+function firstSolidTextColor(fills) {
+  const paint = fills.find((fill) => Boolean(fill && typeof fill === "object" && fill.type === "SOLID"));
+  const color = paint?.color;
+  if (!color || typeof color !== "object") return void 0;
+  return {
+    resolvedValue: colorHex(color),
+    opacity: paint.opacity === void 0 ? 1 : numberOr(paint.opacity, 1),
+    paint: plain(paint)
+  };
+}
+function valueFromComponentProperty(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const record = value;
+    return {
+      value: record.value ?? record.defaultValue ?? record.variantValue ?? value,
+      type: record.type,
+      preferredValues: record.preferredValues ?? record.variantOptions ?? record.options
+    };
+  }
+  return { value };
+}
+function availableStatesFromProperties(input) {
+  const states = [];
+  const variantProperties = plainRecord(input.variantProperties);
+  if (variantProperties) {
+    for (const [name, value] of Object.entries(variantProperties)) {
+      states.push({ name, value, source: "figma-variant-property" });
+    }
+  }
+  const componentProperties = plainRecord(input.componentProperties);
+  if (componentProperties) {
+    for (const [name, rawValue] of Object.entries(componentProperties)) {
+      const parsed = valueFromComponentProperty(rawValue);
+      states.push({
+        name,
+        value: plain(parsed.value),
+        type: parsed.type,
+        preferredValues: plain(parsed.preferredValues),
+        source: "figma-component-property"
+      });
+    }
+  }
+  const componentPropertyDefinitions = plainRecord(input.componentPropertyDefinitions);
+  if (componentPropertyDefinitions) {
+    for (const [name, rawValue] of Object.entries(componentPropertyDefinitions)) {
+      const parsed = valueFromComponentProperty(rawValue);
+      const record = rawValue && typeof rawValue === "object" && !Array.isArray(rawValue) ? rawValue : {};
+      states.push({
+        name,
+        value: plain(parsed.value),
+        type: parsed.type,
+        preferredValues: plain(parsed.preferredValues ?? record.options ?? record.variantOptions),
+        source: "figma-component-property-definition"
+      });
+    }
+  }
+  if (input.visible === false) {
+    states.push({ name: "visibility", value: "hidden", source: "figma-node-visibility" });
+  }
+  return states.filter((state) => state.value !== void 0);
+}
 function boundsOf(node) {
   const raw = node.absoluteBoundingBox || node.bounds || node.rect || node;
   return {
@@ -44,26 +122,66 @@ function paddingOf(node) {
 }
 function componentRefFromNode(node, mainComponent) {
   if (node.type !== "INSTANCE" && !mainComponent && !node.componentRef) return null;
-  const componentProperties = plain(node.componentProperties);
+  const componentProperties = plainRecord(node.componentProperties);
+  const variantProperties = plainRecord(node.variantProperties);
+  const componentSet = mainComponent?.parent || node.componentSet;
   return {
-    componentId: String(mainComponent?.id || node.componentId || node.mainComponentId || "") || void 0,
-    mainComponentNodeId: String(mainComponent?.id || node.mainComponentId || "") || void 0,
-    mainComponentName: String(mainComponent?.name || node.mainComponentName || "") || void 0,
-    componentSetId: String(mainComponent?.parent?.id || node.componentSetId || "") || void 0,
-    variant: componentProperties || plain(node.variantProperties),
-    componentProperties
+    source: "figma",
+    instanceNodeId: node.type === "INSTANCE" ? stringOrUndefined(node.id) : void 0,
+    componentId: stringOrUndefined(mainComponent?.id || node.componentId || node.mainComponentId),
+    mainComponentNodeId: stringOrUndefined(mainComponent?.id || node.mainComponentId),
+    mainComponentKey: stringOrUndefined(mainComponent?.key || node.mainComponentKey),
+    mainComponentName: stringOrUndefined(mainComponent?.name || node.mainComponentName),
+    mainComponentType: stringOrUndefined(mainComponent?.type || node.mainComponentType),
+    componentSetId: stringOrUndefined(componentSet?.id || node.componentSetId),
+    componentSetName: stringOrUndefined(componentSet?.name || node.componentSetName),
+    variantProperties,
+    componentProperties,
+    variant: variantProperties || componentProperties || void 0,
+    availableStates: availableStatesFromProperties({ variantProperties, componentProperties, visible: visibleOf(node) })
   };
 }
+function compactRecord(record) {
+  return Object.fromEntries(Object.entries(record).filter(([, value]) => value !== void 0));
+}
 function serializeLayerNode(input, options = {}) {
-  const children = asArray(input.children).map((child, index) => serializeLayerNode(child, { zIndex: index }));
+  const children = asArray(input.children).map((child, index) => serializeLayerNode(child, { zIndex: index, parentNodeId: String(input.id || "") || void 0 }));
   const fills = asArray(input.fills).map((fill) => plain(fill)).filter(Boolean);
   const imageFillRefs = fills.filter((fill) => Boolean(fill && typeof fill === "object" && fill.type === "IMAGE" && fill.imageHash)).map((fill) => ({
     imageHash: String(fill.imageHash),
     scaleMode: fill.scaleMode ? String(fill.scaleMode) : void 0,
     filters: fill.filters
   }));
+  const visible = visibleOf(input);
+  const componentProperties = plainRecord(input.componentProperties);
+  const variantProperties = plainRecord(input.variantProperties);
+  const componentPropertyDefinitions = plainRecord(input.componentPropertyDefinitions);
+  const availableStates = availableStatesFromProperties({ variantProperties, componentProperties, componentPropertyDefinitions, visible });
+  const bounds = boundsOf(input);
+  const layout = {
+    layoutMode: input.layoutMode ? String(input.layoutMode) : void 0,
+    primaryAxisSizingMode: input.primaryAxisSizingMode,
+    counterAxisSizingMode: input.counterAxisSizingMode,
+    primaryAxisAlignItems: input.primaryAxisAlignItems,
+    counterAxisAlignItems: input.counterAxisAlignItems,
+    layoutWrap: input.layoutWrap,
+    layoutGrow: input.layoutGrow,
+    layoutAlign: input.layoutAlign,
+    layoutPositioning: input.layoutPositioning,
+    layoutSizingHorizontal: input.layoutSizingHorizontal,
+    layoutSizingVertical: input.layoutSizingVertical,
+    itemReverseZIndex: input.itemReverseZIndex,
+    strokesIncludedInLayout: input.strokesIncludedInLayout,
+    clipsContent: input.clipsContent,
+    overflowDirection: input.overflowDirection,
+    minWidth: input.minWidth,
+    maxWidth: input.maxWidth,
+    minHeight: input.minHeight,
+    maxHeight: input.maxHeight
+  };
   const text = input.type === "TEXT" ? {
     content: String(input.characters ?? ""),
+    fontName: plain(input.fontName),
     fontFamily: typeof input.fontName === "object" ? input.fontName.family : input.fontFamily,
     fontStyle: typeof input.fontName === "object" ? input.fontName.style : void 0,
     fontSize: input.fontSize,
@@ -71,22 +189,42 @@ function serializeLayerNode(input, options = {}) {
     lineHeight: plain(input.lineHeight),
     letterSpacing: plain(input.letterSpacing),
     alignHorizontal: input.textAlignHorizontal,
-    alignVertical: input.textAlignVertical
+    alignVertical: input.textAlignVertical,
+    color: firstSolidTextColor(fills),
+    textStyleId: input.textStyleId
   } : null;
+  const styleIds = compactRecord({
+    fillStyleId: input.fillStyleId,
+    strokeStyleId: input.strokeStyleId,
+    textStyleId: input.textStyleId,
+    effectStyleId: input.effectStyleId,
+    gridStyleId: input.gridStyleId
+  });
+  const boundVariables = plain(input.boundVariables);
+  const explicitVariableModes = plain(input.explicitVariableModes);
+  const resolvedVariableModes = plain(input.resolvedVariableModes);
   return {
     nodeId: String(input.id || "unknown-node"),
     figmaNodeId: String(input.id || "unknown-node"),
+    parentNodeId: options.parentNodeId || stringOrUndefined(input.parentId),
     name: String(input.name || input.id || "Unnamed"),
     type: String(input.type || "UNKNOWN"),
+    key: stringOrUndefined(input.key),
+    description: stringOrUndefined(input.description),
     role: options.role,
-    bounds: boundsOf(input),
+    bounds,
+    size: { width: numberOr(input.width, bounds.width), height: numberOr(input.height, bounds.height) },
     zIndex: options.zIndex ?? 0,
-    visible: input.visible === void 0 ? true : Boolean(input.visible),
+    sourceOrder: options.zIndex ?? 0,
+    visible,
+    hidden: !visible,
     locked: Boolean(input.locked),
+    relativeTransform: plain(input.relativeTransform),
     layoutMode: input.layoutMode ? String(input.layoutMode) : void 0,
     constraints: plain(input.constraints),
     padding: paddingOf(input),
     gap: input.itemSpacing === void 0 ? void 0 : numberOr(input.itemSpacing, 0),
+    layout: Object.fromEntries(Object.entries(layout).filter(([, value]) => value !== void 0)),
     fills,
     strokes: asArray(input.strokes).map((stroke) => plain(stroke)).filter(Boolean),
     strokeWeight: plain(input.strokeWeight),
@@ -96,8 +234,25 @@ function serializeLayerNode(input, options = {}) {
     blendMode: input.blendMode ? String(input.blendMode) : "NORMAL",
     text,
     componentRef: componentRefFromNode(input, options.mainComponent),
+    componentProperties,
+    variantProperties,
+    componentPropertyDefinitions,
+    availableStates,
     imageFillRefs,
-    boundVariables: plain(input.boundVariables),
+    boundVariables,
+    explicitVariableModes,
+    resolvedVariableModes,
+    styleIds,
+    tokenRefs: compactRecord({
+      styleIds,
+      boundVariables,
+      explicitVariableModes,
+      resolvedVariableModes,
+      textStyleId: input.textStyleId,
+      fillStyleId: input.fillStyleId,
+      strokeStyleId: input.strokeStyleId,
+      effectStyleId: input.effectStyleId
+    }),
     children
   };
 }
@@ -123,18 +278,53 @@ function collectComponentInstances(nodes) {
     nodeId: node.nodeId,
     figmaNodeId: node.figmaNodeId,
     name: node.name,
+    type: node.type,
+    role: node.role,
+    visible: node.visible,
+    hidden: node.hidden,
+    locked: node.locked,
     mainComponentNodeId: node.componentRef?.mainComponentNodeId || node.componentRef?.componentId,
+    mainComponentName: node.componentRef?.mainComponentName,
     componentSetId: node.componentRef?.componentSetId,
+    componentSetName: node.componentRef?.componentSetName,
+    componentRef: node.componentRef,
+    variantProperties: node.variantProperties || node.componentRef?.variantProperties || {},
+    componentProperties: node.componentProperties || node.componentRef?.componentProperties || {},
+    availableStates: node.availableStates || node.componentRef?.availableStates || [],
     variant: node.componentRef?.variant || {},
     bounds: node.bounds
   }));
 }
+function collectVisualStateSources(nodes) {
+  return flattenSerializedLayers(nodes).filter((node) => ["FRAME", "SECTION", "COMPONENT_SET", "COMPONENT", "INSTANCE"].includes(node.type)).filter((node) => node.type !== "INSTANCE" || node.hidden || node.availableStates && node.availableStates.length > 0).map((node) => ({
+    nodeId: node.nodeId,
+    figmaNodeId: node.figmaNodeId,
+    parentNodeId: node.parentNodeId,
+    name: node.name,
+    type: node.type,
+    role: node.role,
+    source: "figma-native-node",
+    sourceKind: node.type === "COMPONENT" ? "component-variant-node" : node.type === "COMPONENT_SET" ? "component-set" : node.type === "INSTANCE" ? "component-instance" : "state-capable-frame",
+    bounds: node.bounds,
+    size: node.size,
+    sourceOrder: node.sourceOrder,
+    visible: node.visible,
+    hidden: node.hidden,
+    componentRef: node.componentRef,
+    componentProperties: node.componentProperties || {},
+    variantProperties: node.variantProperties || {},
+    availableStates: node.availableStates || []
+  }));
+}
 export {
+  availableStatesFromProperties,
   boundsOf,
   collectComponentInstances,
+  collectVisualStateSources,
   componentRefFromNode,
   flattenSerializedLayers,
   paddingOf,
+  plain,
   serializeLayerNode,
   serializeLayerTree
 };

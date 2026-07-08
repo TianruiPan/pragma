@@ -45,8 +45,9 @@ function sampleBundle(repo) {
     files: [
       { path: "capture.json", kind: "json", content: { repo: { owner: "local", name: "repo", localPath: repo }, designIssue: { number: 12 }, figma: { fileKey: "file123" }, capturedAt: "2026-07-07T00:00:00.000Z" } },
       { path: "figma/selection.json", kind: "json", content: { fileKey: "file123", frames: { page: [{ nodeId: "1:2", name: "Home" }], components: null, assets: null } } },
-      { path: "figma/layers.json", kind: "json", content: { nodes: [{ nodeId: "1:2", figmaNodeId: "1:2", name: "Home", type: "FRAME", children: [{ nodeId: "2:3", figmaNodeId: "2:3", name: "Button", type: "INSTANCE", componentRef: { mainComponentNodeId: "5:6" }, children: [] }] }] } },
-      { path: "figma/components.json", kind: "json", content: { schemaVersion: "2.0", kind: "pragma-components", instances: [{ figmaNodeId: "2:3", mainComponentNodeId: "5:6" }] } },
+      { path: "figma/layers.json", kind: "json", content: { nodes: [{ nodeId: "1:2", figmaNodeId: "1:2", name: "Home", type: "FRAME", visible: true, hidden: false, styleIds: { fillStyleId: "S:fill" }, boundVariables: { fills: [{ id: "VariableID:1" }] }, children: [{ nodeId: "2:3", figmaNodeId: "2:3", name: "Button", type: "INSTANCE", visible: false, hidden: true, componentRef: { mainComponentNodeId: "5:6" }, variantProperties: { State: "Pressed" }, componentProperties: { state: { value: "pressed" } }, children: [] }] }] } },
+      { path: "figma/components.json", kind: "json", content: { schemaVersion: "2.0", kind: "pragma-components", instances: [{ figmaNodeId: "2:3", mainComponentNodeId: "5:6", visible: false, hidden: true, variantProperties: { State: "Pressed" }, componentProperties: { state: { value: "pressed" } } }], metadataCompleteness: { instanceCount: 1, componentMetadataMissingCount: 0, visibilityFactsCount: 2 } } },
+      { path: "figma/variables.json", kind: "json", content: { schemaVersion: "2.0", kind: "pragma-figma-variables", variables: [{ id: "VariableID:1", name: "color/bg" }], styles: [{ id: "S:fill", name: "surface/bg", type: "PAINT" }] } },
       { path: "assets-manifest.json", kind: "json", content: { schemaVersion: "2.0", kind: "pragma-design-assets", assets: [] } },
       { path: "asset-bindings.json", kind: "json", content: { schemaVersion: "2.0", kind: "pragma-asset-bindings", bindings: [] } },
       { path: "designer-notes.md", kind: "text", content: "notes" },
@@ -73,6 +74,13 @@ test("writes bundle and resolves missing components when no registry exists", as
     assert.equal(summary.kind, "pragma-figma-capture-summary");
     assert.equal(summary.captureTimings.totalMs, result.captureTimings.totalMs);
     assert.equal(summary.diagnostics.frameRoles.page.count, 1);
+    assert.equal(summary.diagnostics.componentInstanceCount, 1);
+    assert.equal(summary.diagnostics.componentMetadataMissingCount, 0);
+    assert.equal(summary.diagnostics.visibilityFactsCount, 2);
+    assert.equal(summary.diagnostics.styleRefNodeCount, 1);
+    assert.equal(summary.diagnostics.variableRefNodeCount, 1);
+    assert.equal(summary.diagnostics.localVariableCount, 1);
+    assert.equal(summary.diagnostics.localStyleCount, 1);
   } finally {
     await rm(repo, { recursive: true, force: true });
   }

@@ -313,6 +313,16 @@ function frameRoleSummary(selection) {
 function trustedChecksum(value) {
   return /^sha256:[0-9a-f]{64}$/i.test(String(value || ""));
 }
+function flattenLayerNodes(nodes) {
+  const output = [];
+  const walk = (node) => {
+    if (!node || typeof node !== "object") return;
+    output.push(node);
+    if (Array.isArray(node.children)) node.children.forEach(walk);
+  };
+  nodes.forEach(walk);
+  return output;
+}
 function buildTimings(bundle, writeFilesMs, dependencyLockMs) {
   const source = bundle.summary?.captureTimings || {};
   const serializeMs = numericMs(source.serializeMs);
@@ -331,11 +341,20 @@ function buildTimings(bundle, writeFilesMs, dependencyLockMs) {
 }
 async function buildDiagnostics(outputDir, dependencyLock) {
   const selection = await readJsonIfExists2(path2.join(outputDir, "figma", "selection.json"), {});
+  const layers = await readJsonIfExists2(path2.join(outputDir, "figma", "layers.json"), { nodes: [] });
+  const components = await readJsonIfExists2(path2.join(outputDir, "figma", "components.json"), {});
+  const variables = await readJsonIfExists2(path2.join(outputDir, "figma", "variables.json"), {});
   const assetManifest = await readJsonIfExists2(path2.join(outputDir, "assets-manifest.json"), { assets: [] });
   const assetBindings = await readJsonIfExists2(path2.join(outputDir, "asset-bindings.json"), { bindings: [] });
   const dynamicRegionNotes = await readTextIfExists(path2.join(outputDir, "dynamic-regions.md"), "");
   const assets = asArray(assetManifest?.assets);
   const bindings = asArray(assetBindings?.bindings);
+  const layerNodes = flattenLayerNodes(asArray(layers?.nodes));
+  const componentInstances = asArray(components?.instances);
+  const componentMetadataMissingCount = Number.isFinite(Number(components?.metadataCompleteness?.componentMetadataMissingCount)) ? Number(components.metadataCompleteness.componentMetadataMissingCount) : componentInstances.filter((instance) => !instance?.mainComponentNodeId && !instance?.componentRef?.mainComponentNodeId).length;
+  const visibilityFactsCount = Number.isFinite(Number(components?.metadataCompleteness?.visibilityFactsCount)) ? Number(components.metadataCompleteness.visibilityFactsCount) : layerNodes.filter((node) => typeof node?.visible === "boolean" || typeof node?.hidden === "boolean").length;
+  const styleRefNodeCount = layerNodes.filter((node) => node?.styleIds && Object.keys(node.styleIds).length > 0).length;
+  const variableRefNodeCount = layerNodes.filter((node) => node?.boundVariables || node?.tokenRefs?.boundVariables).length;
   const selectedPendingPreflight = ["components", "assets"].map((role) => ({ role, dependency: dependencyLock?.[role] })).filter((item) => item.dependency?.status === "selected" && item.dependency?.needsSourceSync === true).map((item) => ({
     role: item.role,
     frameNodeIds: item.dependency.frameNodeIds || (item.dependency.frameNodeId ? [item.dependency.frameNodeId] : []),
@@ -349,6 +368,14 @@ async function buildDiagnostics(outputDir, dependencyLock) {
     frameRoles: frameRoleSummary(selection),
     assetCount: assets.length,
     assetChecksumUnavailableCount: assets.filter((asset) => !trustedChecksum(asset?.checksum) && (asset?.checksumStatus === "unavailable" || !asset?.checksum)).length,
+    componentInstanceCount: componentInstances.length,
+    componentMetadataMissingCount,
+    visibilityFactsCount,
+    styleRefNodeCount,
+    variableRefNodeCount,
+    localVariableCount: asArray(variables?.variables).length,
+    localStyleCount: asArray(variables?.styles).length,
+    assetBindingCount: bindings.length,
     unresolvedSharedRefCount: unresolvedSharedRefs.length,
     unresolvedSharedRefs: unresolvedSharedRefs.map((binding) => ({ assetId: binding?.assetId, figmaNodeId: binding?.figmaNodeId, nodeId: binding?.nodeId })),
     dynamicRegionNotesMissing: dynamicRegionNotes.trim().length === 0,

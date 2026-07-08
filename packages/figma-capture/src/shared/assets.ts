@@ -4,9 +4,13 @@ export interface AssetBindingInput {
   assetId: string;
   nodeId?: string;
   figmaNodeId?: string;
+  sourceNodeIds?: string[];
+  usedByNodeIds?: string[];
+  scope?: "page" | "shared";
   fit?: string;
   crop?: object | null;
   placement?: RectLike | null;
+  sourcePaint?: unknown;
 }
 
 export function slugify(value: string | undefined | null, fallback = "item"): string {
@@ -123,6 +127,7 @@ export function createAssetRecord(input: {
   checksum?: string;
   checksumStatus?: "unavailable";
   sourceNodeIds?: string[];
+  usedByNodeIds?: string[];
   bindings?: AssetBindingInput[];
   required?: boolean;
 }) {
@@ -136,7 +141,7 @@ export function createAssetRecord(input: {
     width: input.width,
     height: input.height,
     sourceNodeIds: input.sourceNodeIds || [],
-    bindings: (input.bindings || []).map(createAssetBinding),
+    usedByNodeIds: input.usedByNodeIds || input.sourceNodeIds || [],
     required: input.required !== false
   };
   if (/^sha256:[0-9a-f]{64}$/i.test(input.checksum || "")) record.checksum = input.checksum;
@@ -149,8 +154,12 @@ export function createAssetBinding(input: AssetBindingInput) {
     assetId: input.assetId,
     nodeId: input.nodeId,
     figmaNodeId: input.figmaNodeId,
+    sourceNodeIds: input.sourceNodeIds || (input.figmaNodeId ? [input.figmaNodeId] : []),
+    usedByNodeIds: input.usedByNodeIds || (input.nodeId || input.figmaNodeId ? [input.nodeId || input.figmaNodeId].filter(Boolean) : []),
+    scope: input.scope,
     fit: input.fit || "contain",
     crop: input.crop ?? null,
-    placement: input.placement ?? undefined
+    placement: input.placement ?? undefined,
+    sourcePaint: input.sourcePaint
   };
 }

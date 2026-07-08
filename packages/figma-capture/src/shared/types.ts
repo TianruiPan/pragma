@@ -17,6 +17,8 @@ export interface CaptureFrame {
   type?: string;
   width?: number;
   height?: number;
+  bounds?: RectLike;
+  viewport?: { width: number; height: number };
   role?: FrameRole;
   optional?: boolean;
   url?: string;

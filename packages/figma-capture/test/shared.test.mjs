@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { parseFigmaUrl, normalizeFigmaNodeId, figmaNodeIdForUrl, resolveRequiredFigmaFileKey } from "../dist/shared/figma-url.js";
 import { normalizeBridgeEndpoint } from "../dist/shared/bridge-url.js";
 import { assertFrameRoles, buildCaptureJson, buildSelectionJson } from "../dist/shared/roles.js";
-import { collectComponentInstances, serializeLayerNode } from "../dist/shared/layer.js";
-import { createAssetRecord, sniffAssetBytes, sniffMime } from "../dist/shared/assets.js";
+import { collectComponentInstances, collectVisualStateSources, serializeLayerNode } from "../dist/shared/layer.js";
+import { createAssetBinding, createAssetRecord, sniffAssetBytes, sniffMime } from "../dist/shared/assets.js";
 
 test("normalizes and parses Figma node ids", () => {
   assert.equal(normalizeFigmaNodeId("1206-31342"), "1206:31342");
@@ -62,15 +62,36 @@ test("serializes layer nodes and extracts component refs", () => {
     id: "7:8",
     name: "Primary button",
     type: "INSTANCE",
+    visible: false,
     absoluteBoundingBox: { x: 10, y: 20, width: 120, height: 40 },
+    width: 120,
+    height: 40,
+    fillStyleId: "S:fill",
+    textStyleId: "S:text",
+    boundVariables: { fills: [{ type: "VARIABLE_ALIAS", id: "VariableID:1" }] },
+    variantProperties: { State: "Pressed" },
     componentProperties: { state: { value: "default" } },
-    children: [{ id: "7:9", name: "Label", type: "TEXT", characters: "Submit", absoluteBoundingBox: { x: 20, y: 30, width: 80, height: 20 } }]
-  }, { mainComponent: { id: "5:6", name: "Button" } });
+    children: [{ id: "7:9", name: "Label", type: "TEXT", characters: "Submit", fills: [{ type: "SOLID", color: { r: 1, g: 0.5, b: 0 }, opacity: 0.8 }], absoluteBoundingBox: { x: 20, y: 30, width: 80, height: 20 } }]
+  }, { mainComponent: { id: "5:6", name: "Button", parent: { id: "4:5", name: "Button set" } } });
   assert.equal(serialized.bounds.width, 120);
+  assert.equal(serialized.size.width, 120);
+  assert.equal(serialized.hidden, true);
+  assert.equal(serialized.componentRef.componentSetName, "Button set");
+  assert.equal(serialized.componentRef.variantProperties.State, "Pressed");
+  assert.equal(serialized.styleIds.fillStyleId, "S:fill");
+  assert.equal(serialized.tokenRefs.boundVariables.fills[0].id, "VariableID:1");
+  assert.equal(serialized.availableStates.some((state) => state.source === "figma-node-visibility" && state.value === "hidden"), true);
   assert.equal(serialized.children[0].text.content, "Submit");
+  assert.equal(serialized.children[0].text.color.resolvedValue, "#FF8000");
   const instances = collectComponentInstances([serialized]);
   assert.equal(instances[0].mainComponentNodeId, "5:6");
+  assert.equal(instances[0].componentSetId, "4:5");
+  assert.equal(instances[0].hidden, true);
+  assert.equal(instances[0].availableStates.some((state) => state.name === "State" && state.value === "Pressed"), true);
   assert.equal(instances[0].bounds.height, 40);
+  const visualStateSources = collectVisualStateSources([serialized]);
+  assert.equal(visualStateSources[0].sourceKind, "component-instance");
+  assert.equal(/runtimeDefault|businessDefault/i.test(JSON.stringify(serialized)), false);
 });
 
 test("creates asset records with bindings and sniffs png", () => {
@@ -86,13 +107,21 @@ test("creates asset records with bindings and sniffs png", () => {
     mime,
     path: "assets/images/home.png",
     checksum: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    bindings: [{ assetId: "asset-home-bg", figmaNodeId: "1:2", fit: "cover" }]
+    sourceNodeIds: ["1:2"],
+    usedByNodeIds: ["1:2"],
+    bindings: [{ assetId: "asset-home-bg", figmaNodeId: "1:2", sourceNodeIds: ["1:2"], usedByNodeIds: ["1:2"], scope: "page", fit: "cover" }]
   });
   assert.equal(asset.type, "png");
   assert.equal(asset.checksum, "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
   assert.equal(sniffed.width, 2);
   assert.equal(sniffed.height, 3);
-  assert.equal(asset.bindings[0].fit, "cover");
+  assert.deepEqual(asset.usedByNodeIds, ["1:2"]);
+  assert.equal(asset.bindings, undefined);
+  const binding = createAssetBinding({ assetId: "asset-home-bg", figmaNodeId: "1:2", sourceNodeIds: ["1:2"], usedByNodeIds: ["1:2"], scope: "page", fit: "cover", placement: { x: 1, y: 2, width: 3, height: 4 } });
+  assert.equal(binding.fit, "cover");
+  assert.deepEqual(binding.sourceNodeIds, ["1:2"]);
+  assert.equal(binding.scope, "page");
+  assert.equal(binding.placement.width, 3);
 
   const invalidChecksum = createAssetRecord({
     id: "asset-invalid-checksum",

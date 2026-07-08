@@ -39,7 +39,10 @@ function buildSelectionJson(input) {
       type: frame.type,
       width: frame.width,
       height: frame.height,
-      role: frame.role
+      bounds: frame.bounds,
+      viewport: frame.viewport,
+      role: frame.role,
+      url: frame.url
     }))
   };
 }

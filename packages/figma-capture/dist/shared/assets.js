@@ -108,7 +108,7 @@ function createAssetRecord(input) {
     width: input.width,
     height: input.height,
     sourceNodeIds: input.sourceNodeIds || [],
-    bindings: (input.bindings || []).map(createAssetBinding),
+    usedByNodeIds: input.usedByNodeIds || input.sourceNodeIds || [],
     required: input.required !== false
   };
   if (/^sha256:[0-9a-f]{64}$/i.test(input.checksum || "")) record.checksum = input.checksum;
@@ -120,9 +120,13 @@ function createAssetBinding(input) {
     assetId: input.assetId,
     nodeId: input.nodeId,
     figmaNodeId: input.figmaNodeId,
+    sourceNodeIds: input.sourceNodeIds || (input.figmaNodeId ? [input.figmaNodeId] : []),
+    usedByNodeIds: input.usedByNodeIds || (input.nodeId || input.figmaNodeId ? [input.nodeId || input.figmaNodeId].filter(Boolean) : []),
+    scope: input.scope,
     fit: input.fit || "contain",
     crop: input.crop ?? null,
-    placement: input.placement ?? void 0
+    placement: input.placement ?? void 0,
+    sourcePaint: input.sourcePaint
   };
 }
 export {
