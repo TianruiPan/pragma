@@ -23,7 +23,7 @@ Load `manifest.json` in Figma after build. The manifest points to `dist/code.js`
    - `page`: required; one or more implementation frames/states.
    - `components`: optional; one or more component sheets such as `App Mobile / Components`.
    - `assets`: optional; one or more export boards or asset sheets.
-3. Fill the required fields: design issue number and either a Figma file URL or file key. Repo path is required for local bridge writes unless `--repo` was passed when starting the bridge.
+3. Fill the required fields: Design Issue number and either a Figma file URL or file key. The optional linked dev Issue fields identify implementation Issues that this Design Issue unlocks. Repo path is required for local bridge writes unless `--repo` was passed when starting the bridge.
 4. Use one of the actions:
    - `Export capture`: downloads a JSON bundle containing the `pragma-input/` file tree.
    - `Send to local bridge`: posts the bundle to `http://localhost:48732/capture`.
@@ -51,6 +51,10 @@ By default the bridge writes to:
 ```
 
 It reads `.pragma/design-sources/figma/<fileKey>/registry.json` when present and writes `dependency-lock.json` with `selected`, `reused`, `missing`, or `none` statuses. `reused` entries point to concrete registry snapshots. `selected` entries keep `frameNodeIds` and are marked `pending-preflight` until Pragma core materializes the snapshot. It never writes Figma tokens, credentials, full Figma files, or unrelated pages.
+
+## Responsibility Boundary
+
+This package only captures Figma/design-tool facts into `pragma-input/`. It does not write Gitea Issues, create branches or PRs, publish versioned `.pragma/design-contexts/issue-*/versions/v*/` packages, run `pragma design read`, or decide whether a development Issue is blocked. Those actions belong to Pragma core/CLI and the generic Issue/Git tools.
 
 ## Output Shape
 
@@ -80,6 +84,7 @@ pragma-input/
 ## Core Handoff Fields
 
 - `capture.json.figma.frames`: explicit page/components/assets role selection.
+- `capture.json.designIssue`: the Design Issue that owns this capture; `targetDevIssues` are linked development Issues that the Design Issue will unlock.
 - `figma/selection.json.frames.*[]`: generated per-frame Figma URLs plus role, nodeId, name, bounds, and viewport when a fileKey is available.
 - `dependency-lock.json`: bridge-resolved snapshot dependency status; reused entries are concrete, while selected components/assets include `frameNodeIds` and `needsSourceSync: true` for core `preflight --fix`.
 - `figma/metadata.json`: selected-file/page/frame/node native facts, including fileKey, fileName, page metadata, selected frame size/URL, visibility counts, component metadata completeness, and style/variable refs.

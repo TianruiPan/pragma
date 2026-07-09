@@ -38,9 +38,16 @@ test("validates required page role and duplicate assignments", () => {
 
 test("builds capture and selection json with frame roles", () => {
   const frames = { page: [{ nodeId: "1:1", name: "Home", role: "page" }], components: null, assets: null };
-  const capture = buildCaptureJson({ repo: { owner: "local", name: "repo" }, designIssue: { number: 2 }, figma: { fileKey: "abc", frames } }, "2026-07-07T00:00:00.000Z");
+  const capture = buildCaptureJson({
+    repo: { owner: "local", name: "repo" },
+    designIssue: { number: 2, title: "Home design delivery" },
+    targetDevIssues: [{ number: 3, title: "Implement Home" }],
+    figma: { fileKey: "abc", frames }
+  }, "2026-07-07T00:00:00.000Z");
   const selection = buildSelectionJson({ fileKey: "abc", frames });
   assert.deepEqual(capture.figma.nodeIds, ["1:1"]);
+  assert.equal(capture.designIssue.title, "Home design delivery");
+  assert.equal(capture.targetDevIssues[0].title, "Implement Home");
   assert.equal(selection.frames.page[0].role, "page");
 });
 

@@ -89,7 +89,7 @@
 
     <section>
       <div class="hint">
-        Required: at least one page frame, a design issue number, and a file key from the Figma URL or override. Send to local bridge also requires <span class="muted">http://localhost:48732/capture</span> and a running bridge process.
+        Needs Design Issue: yes. Required: at least one page frame, Design Issue number, and a file key from the Figma URL or override. Send to local bridge also requires <span class="muted">http://localhost:48732/capture</span> and a running bridge process.
       </div>
       <div class="grid">
         <div><label>Repo owner</label><input id="repoOwner" value="local" /></div>
@@ -97,9 +97,11 @@
       </div>
       <label>Repo local path</label><input id="repoLocalPath" placeholder="D:/path/to/repo" />
       <div class="grid">
-        <div><label>Design issue number</label><input id="designIssueNumber" type="number" min="1" value="1" /></div>
-        <div><label>Target dev issue number</label><input id="targetDevIssueNumber" type="number" min="1" /></div>
+        <div><label>Design Issue #</label><input id="designIssueNumber" type="number" min="1" value="1" /></div>
+        <div><label>Linked dev Issue #</label><input id="targetDevIssueNumber" type="number" min="1" /></div>
       </div>
+      <label>Design Issue title</label><input id="designIssueTitle" placeholder="Design delivery title" />
+      <label>Linked dev Issue title</label><input id="targetDevIssueTitle" placeholder="Optional implementation issue title" />
       <label>Figma URL or file URL</label><input id="figmaUrl" placeholder="https://www.figma.com/design/...?...node-id=..." />
       <label>File key override</label><input id="fileKey" placeholder="Auto-filled when Figma exposes fileKey" />
       <label>Designer notes</label><textarea id="designerNotes" placeholder="Intent, priorities, implementation boundaries"></textarea>
@@ -126,7 +128,7 @@
       fileKeyFromFigma: ""
     };
     const $ = (id) => document.getElementById(id);
-    const fields = ["repoOwner", "repoName", "repoLocalPath", "designIssueNumber", "targetDevIssueNumber", "figmaUrl", "fileKey", "designerNotes", "dynamicRegionNotes"];
+    const fields = ["repoOwner", "repoName", "repoLocalPath", "designIssueNumber", "designIssueTitle", "targetDevIssueNumber", "targetDevIssueTitle", "figmaUrl", "fileKey", "designerNotes", "dynamicRegionNotes"];
 
     function escapeHtml(value) {
       return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
@@ -247,7 +249,7 @@
       if (!request.fileKey) request.fileKey = currentFileKey();
       if (!request.fileKey) throw new Error("Figma fileKey is required. Paste the Figma file URL or fill File key override.");
       request.designIssueNumber = Number(request.designIssueNumber || 1);
-      if (!Number.isInteger(request.designIssueNumber) || request.designIssueNumber <= 0) throw new Error("Design issue number must be a positive integer.");
+      if (!Number.isInteger(request.designIssueNumber) || request.designIssueNumber <= 0) throw new Error("Design Issue number must be a positive integer.");
       request.targetDevIssueNumber = request.targetDevIssueNumber ? Number(request.targetDevIssueNumber) : undefined;
       return request;
     }

@@ -1,7 +1,7 @@
 import { buildCaptureBundle } from "./serializer.js";
 import { normalizeBridgeEndpoint } from "../shared/bridge-url.js";
 
-figma.showUI(__PRAGMA_UI_HTML__, { width: 520, height: 760, themeColors: true });
+figma.showUI(__PRAGMA_UI_HTML__, { width: 520, height: 820, themeColors: true });
 
 function selectionSummary() {
   return figma.currentPage.selection.map((node: any) => ({
