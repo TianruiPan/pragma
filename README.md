@@ -24,6 +24,8 @@ Issue model:
 - Dev Issue `需要 Design Issue：否`: Pragma is not required; design links are human reference only.
 - Dev Issue `需要 Design Issue：是`: the Dev Issue depends on a same-repo Design Issue, and Agents read Pragma from that Design Issue's `current.json` after the design PR has merged.
 
+Deployments verify the installed CLI with `pragma --version --json`; see `docs/compatibility-handshake.md` for the `pragma-integration/v1` handshake.
+
 ## Folder Contract
 
 Default repo path for a Design Issue:
