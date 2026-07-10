@@ -9,6 +9,7 @@ import { mimeForType, sniffAssetFile, typeFromExtension } from "./mime.js";
 import { isFrameRenderAsset } from "./normalize.js";
 import { utf8Diagnostics } from "./text-encoding.js";
 import { isVersionDir, normalizeVersion, readCurrentPointer, resolveVersionContext } from "./versioning.js";
+import { pragmaContextObjectKey, resolveMinioPublishConfig, statMinioObject } from "./minio.js";
 
 function assert(condition, message, errors) {
   if (!condition) errors.push(message);
@@ -992,7 +993,7 @@ export async function validateDesignContext(options) {
     }
   }
 
-  const assetsMayBeExternal = manifest.artifact?.storage === "gitea-generic-package";
+  const assetsMayBeExternal = manifest.artifact?.storage === "minio-s3";
   const assetIds = new Set();
   if (assetsManifest) {
     assert(assetsManifest.schemaVersion === "2.0", "assets.schemaVersion must be 2.0", errors);
@@ -1117,20 +1118,43 @@ export async function validateDesignContext(options) {
   const secretPath = hasSecretKey(manifest) || hasSecretKey(designContext) || hasSecretKey(pixelSpec) || hasSecretKey(pixelSpecForValidation) || hasSecretKey(layers) || hasSecretKey(layersForValidation) || hasSecretKey(tokens) || hasSecretKey(components) || hasSecretKey(dependencies) || hasSecretKey(assetsManifest);
   assert(!secretPath, `package metadata contains a forbidden secret-like key: ${secretPath}`, errors);
 
-  if (manifest.artifact?.storage === "gitea-generic-package") {
-    assert(Boolean(manifest.artifact.downloadUrl), "manifest.artifact.downloadUrl is required for gitea-generic-package", errors);
-    assert(Boolean(manifest.artifact.checksum), "manifest.artifact.checksum is required for gitea-generic-package", errors);
+  if (manifest.artifact?.storage === "minio-s3") {
+    assert(Boolean(manifest.artifact.bucket), "manifest.artifact.bucket is required for minio-s3", errors);
+    assert(Boolean(manifest.artifact.objectKey), "manifest.artifact.objectKey is required for minio-s3", errors);
+    assert(Boolean(manifest.artifact.checksum), "manifest.artifact.checksum is required for minio-s3", errors);
+    try {
+      const expectedObjectKey = pragmaContextObjectKey({
+        objectPrefix: options["minio-object-prefix"] || options.minioObjectPrefix || process.env.PRAGMA_MINIO_OBJECT_PREFIX,
+        repo: manifest.issue?.repo,
+        designIssue: manifest.issue?.number,
+        version: manifest.version,
+        fileName: manifest.artifact.fileName || "context.zip"
+      });
+      assert(manifest.artifact.objectKey === expectedObjectKey, "manifest.artifact.objectKey does not match package identity", errors);
+    } catch (error) {
+      errors.push(`manifest.artifact.objectKey is invalid: ${error.message}`);
+    }
+    assert(manifest.artifact.uri === `s3://${manifest.artifact.bucket}/${manifest.artifact.objectKey}`, "manifest.artifact.uri must match bucket and objectKey", errors);
     const localZip = path.join(contextDir, manifest.artifact.fileName || "context.zip");
     if (await pathExists(localZip) && manifest.artifact.checksum) {
       const actual = await sha256File(localZip);
       assert(actual === manifest.artifact.checksum, "context.zip checksum does not match manifest.artifact.checksum", errors);
     }
-    if (options.checkRemote && manifest.artifact.downloadUrl) {
+    if (options.checkRemote && manifest.artifact.bucket && manifest.artifact.objectKey) {
       try {
-        const response = await fetch(manifest.artifact.downloadUrl, { method: "HEAD" });
-        assert(response.ok, `Gitea Package Registry URL is not reachable: HTTP ${response.status}`, errors);
+        const config = resolveMinioPublishConfig(options);
+        assert(config.bucket === manifest.artifact.bucket, "Configured MinIO bucket does not match manifest.artifact.bucket", errors);
+        const remote = await statMinioObject({
+          config,
+          bucket: manifest.artifact.bucket,
+          objectKey: manifest.artifact.objectKey,
+          client: options.minioClient
+        });
+        if (manifest.artifact.archiveSizeBytes) {
+          assert(remote.size === manifest.artifact.archiveSizeBytes, "MinIO object size does not match manifest.artifact.archiveSizeBytes", errors);
+        }
       } catch (error) {
-        errors.push(`Gitea Package Registry URL check failed: ${error.message}`);
+        errors.push(`MinIO object check failed: ${error.message}`);
       }
     }
   }

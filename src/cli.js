@@ -57,8 +57,8 @@ function help() {
     `  pragma design source sync --input <dir> --repo <repo> --file-key <key> [--components-frame <node>] [--assets-frame <node>] [--dry-run] [--json]\n` +
     `  pragma design ingest --input <dir> --repo <repo> [--issue 102] [--version v1|--bump auto] [--force]\n` +
     `  pragma design pack --context <dir> [--zip <path>]\n` +
-    `  pragma design publish --context <version-dir> [--supersedes vN] [--change-summary <file>]\n` +
-    `  pragma design publish --repo <repo> --issue <design-issue> [--version vN|--bump auto] [--supersedes vN] [--change-summary <file>]\n` +
+    `  pragma design publish --context <version-dir> [--supersedes vN] [--change-summary <file>] [--minio-endpoint <url>] [--minio-bucket <name>]\n` +
+    `  pragma design publish --repo <repo> --issue <design-issue> [--version vN|--bump auto] [--supersedes vN] [--change-summary <file>] [--minio-endpoint <url>] [--minio-bucket <name>]\n` +
     `  pragma design issue-fragment --repo <repo> --issue <design-issue> [--version current|vN] [--output fragment.md]\n` +
     `  pragma design diff --repo <repo> --issue <design-issue> --from v1 --to v2 [--json]\n` +
     `  pragma design pack-from-figma-capture --input <dir> --repo <repo> [--force] [--issue-fragment-output fragment.md]\n` +

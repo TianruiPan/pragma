@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { parseFigmaUrl } from "../src/core/figma-url.js";
 import { buildComponents } from "../src/core/pixel-normalize.js";
+import { publishDesignContext } from "../src/core/publish.js";
 
 const execFileAsync = promisify(execFile);
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -632,7 +633,7 @@ test("pack writes zip outside context and publish keeps repo mode zip-free", asy
   );
 });
 
-test("publish supports Gitea Generic Package Registry dry run", async () => {
+test("publish supports MinIO object storage dry run without exposing credentials", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-publish-"));
   const { input, repo } = await createInputFixture(tmp);
   await run(["design", "ingest", "--input", input, "--repo", repo]);
@@ -644,16 +645,19 @@ test("publish supports Gitea Generic Package Registry dry run", async () => {
     contextDir,
     "--threshold-mb",
     "0",
-    "--gitea-base-url",
-    "https://gitea.example.com",
-    "--owner",
-    "example-org",
+    "--minio-endpoint",
+    "http://minio.example.com:9000",
+    "--minio-bucket",
+    "product-project-dev-lab",
     "--dry-run"
   ]);
   const publishResult = JSON.parse(publish.stdout);
-  assert.equal(publishResult.mode, "gitea-generic-package");
-  assert.equal(publishResult.artifact.packageVersion, "issue-102-v1");
-  assert.match(publishResult.artifact.downloadUrl, /api\/packages\/example-org\/generic\/pragma-design-context\/issue-102-v1\/context\.zip/);
+  assert.equal(publishResult.mode, "minio-s3");
+  assert.equal(publishResult.artifact.bucket, "product-project-dev-lab");
+  assert.equal(publishResult.artifact.objectKey, "pragma-design-context/example-org/demo-repo/issue-102/v1/context.zip");
+  assert.equal(publishResult.artifact.uri, "s3://product-project-dev-lab/pragma-design-context/example-org/demo-repo/issue-102/v1/context.zip");
+  assert.equal("accessKey" in publishResult.artifact, false);
+  assert.equal("secretKey" in publishResult.artifact, false);
   assert.match(publishResult.artifact.checksum, /^sha256:/);
   await assert.rejects(fs.access(path.join(repo, ".pragma", "design-contexts", "issue-102", "current.json")));
 
@@ -669,6 +673,47 @@ test("publish supports Gitea Generic Package Registry dry run", async () => {
       return true;
     }
   );
+});
+
+test("publish uploads an immutable MinIO object before advancing current", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-minio-upload-"));
+  const { input, repo } = await createInputFixture(tmp);
+  await run(["design", "ingest", "--input", input, "--repo", repo]);
+  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102", "versions", "v1");
+  const uploads = [];
+  const previousAccessKey = process.env.PRAGMA_MINIO_PUBLISH_ACCESS_KEY;
+  const previousSecretKey = process.env.PRAGMA_MINIO_PUBLISH_SECRET_KEY;
+  process.env.PRAGMA_MINIO_PUBLISH_ACCESS_KEY = "test-publisher";
+  process.env.PRAGMA_MINIO_PUBLISH_SECRET_KEY = "test-secret";
+  try {
+    const result = await publishDesignContext({
+      context: contextDir,
+      "threshold-mb": "0",
+      "minio-endpoint": "http://minio.example.com:9000",
+      "minio-bucket": "product-project-dev-lab",
+      minioClient: {
+        async statObject() {
+          throw Object.assign(new Error("missing"), { code: "NoSuchKey" });
+        },
+        async fPutObject(bucket, objectKey, file, metadata) {
+          uploads.push({ bucket, objectKey, file, metadata });
+          return { etag: "fixture-etag", versionId: null };
+        }
+      }
+    });
+
+    assert.equal(result.mode, "minio-s3");
+    assert.equal(uploads.length, 1);
+    assert.equal(uploads[0].bucket, "product-project-dev-lab");
+    assert.equal(uploads[0].objectKey, "pragma-design-context/example-org/demo-repo/issue-102/v1/context.zip");
+    assert.equal(uploads[0].metadata["X-Amz-Meta-Pragma-Sha256"], result.manifest.packageChecksum);
+    await fs.access(path.join(repo, ".pragma", "design-contexts", "issue-102", "current.json"));
+  } finally {
+    if (previousAccessKey === undefined) delete process.env.PRAGMA_MINIO_PUBLISH_ACCESS_KEY;
+    else process.env.PRAGMA_MINIO_PUBLISH_ACCESS_KEY = previousAccessKey;
+    if (previousSecretKey === undefined) delete process.env.PRAGMA_MINIO_PUBLISH_SECRET_KEY;
+    else process.env.PRAGMA_MINIO_PUBLISH_SECRET_KEY = previousSecretKey;
+  }
 });
 
 test("publish rejects version and Design Issue mismatches without advancing current", async () => {
