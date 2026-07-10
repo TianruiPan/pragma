@@ -1,10 +1,10 @@
 # Pragma 2.0 PRD：面向 Gitea Issue 化流程的 AI-native 设计上下文交付
 
-> 文档状态：Pragma 2.0 当前主 PRD；代码实现以 `D:\tianrui_pan\code\pragma-2.0` 为准  
-> 历史讨论稿：`archive/pragma-2.0-discussions/pragma-2.0-mvp-discussion.md`、`archive/pragma-2.0-discussions/gitea-issue-design-workflow-discussion.md`  
-> 目标版本：Pragma 2.0 MVP  
-> 核心定位：设计师端生成自我包含 Design Context Package，Gitea Issue 轻量引用，Codex Agent 按需读取并开发  
-> 默认存储：同一 Gitea repo 默认分支提交版本化 context 目录；超过 20MB 走公司 MinIO bucket `product-project-dev-lab`  
+> 文档状态：Pragma 2.0 当前主 PRD；代码实现以 `D:\tianrui_pan\code\pragma-2.0` 为准
+> 历史讨论稿：`archive/pragma-2.0-discussions/pragma-2.0-mvp-discussion.md`、`archive/pragma-2.0-discussions/gitea-issue-design-workflow-discussion.md`
+> 目标版本：Pragma 2.0 MVP
+> 核心定位：设计师端生成自我包含 Design Context Package，Gitea Issue 轻量引用，Codex Agent 按需读取并开发
+> 默认存储：同一 Gitea repo 默认分支提交版本化 context 目录；超过 20MB 走公司 MinIO bucket `product-project-dev-lab`
 
 ---
 
