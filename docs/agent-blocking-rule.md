@@ -8,7 +8,8 @@ Pragma follows the simplified Issue model:
 
 需要 Design Issue：是
 - 开发 Issue 必须依赖同 repo 的 Design Issue。
-- Agent 必须从默认分支中的 `.pragma/design-contexts/issue-<n>/current.json` 解析当前版本。
+- Runner 必须在启动 Codex turn 前从 pinned 默认分支 commit 的 `.pragma/design-contexts/issue-<n>/current.json` 解析当前版本，并向 Agent 提供 `pragma-context-descriptor/v1`。
+- Agent 直接读取 descriptor 的只读 entrypoints，不调用 Pragma CLI，也不获取 Registry credential。
 ```
 
 Blocking message:
@@ -18,7 +19,7 @@ Blocking message:
 请等待 Design Issue 交付、确认设计 PR 已合入默认分支，或将开发 Issue 标记为“需要 Design Issue：否”。
 ```
 
-`pragma design read --dev-issue-file <file> --repo <repo>` implements the local-file version of this rule. It parses the development issue markdown, finds the dependent Design Issue, resolves `current.json`, and stops with exit code `2` if the current pointer or manifest is missing.
+`pragma design read --dev-issue-file <file> --repo <repo>` remains a local diagnostic/reference implementation of this rule. It is not required on developer machines or in the Codex app-server runtime. Governance Runner implements the production consumer from the shared file and descriptor contract.
 
 Agent read order for an unblocked package:
 
@@ -34,6 +35,6 @@ Agent read order for an unblocked package:
 10. `source/figma-get-design-context.md` only as fallback/source evidence
 11. `screenshots/*` and `validation/visual-baseline.json` for visual comparison
 
-Development PRs must record the Design Issue, resolved Pragma version, manifest path, and checksum actually consumed. Dev branches should be created from, rebased onto, or merged with the default branch that already contains the design PR; they should not depend directly on a design branch.
+Development PRs must record the Design Issue, pinned source commit, resolved Pragma version, manifest path, and checksum actually consumed. Dev branches should be created from, rebased onto, or merged with the default branch that already contains the design PR; they should not depend directly on a design branch.
 
 If `normalized/dependencies.json` reports `missing` for components while the page has component instances, or `missing` for assets while unresolved/shared asset refs exist, the Agent must stop and request a new Design Context Package instead of guessing from Figma names or screenshots.

@@ -24,7 +24,9 @@ Issue model:
 - Dev Issue `需要 Design Issue：否`: Pragma is not required; design links are human reference only.
 - Dev Issue `需要 Design Issue：是`: the Dev Issue depends on a same-repo Design Issue, and Agents read Pragma from that Design Issue's `current.json` after the design PR has merged.
 
-Deployments verify the installed CLI with `pragma --version --json`; see `docs/compatibility-handshake.md` for the `pragma-integration/v1` handshake.
+Development consumption is CLI-free: the Governance Runner resolves and pins the package before starting the Codex turn, then the Agent reads the supplied descriptor and files directly. Developer machines, Codex app-server, and development Agents do not install or invoke Pragma CLI.
+
+Producer/publisher deployments that invoke Pragma commands verify the installed CLI with `pragma --version --json`; see `docs/compatibility-handshake.md`. The shared development-consumption boundary is documented in `docs/development-consumption-contract.md`.
 
 ## Folder Contract
 
@@ -111,6 +113,18 @@ Size policy:
 10. `source/figma-get-design-context.md` only as fallback/source evidence
 11. `screenshots/*` and `validation/visual-baseline.json` for visual comparison
 
+## Development Consumption
+
+For `requires_design_issue: true`, the Governance Runner performs this sequence before `thread/start|resume` and `turn/start`:
+
+1. pin the workspace commit containing the merged design PR;
+2. resolve `current.json` to an immutable manifest;
+3. verify the repo, Design Issue, linked Dev Issue, version, checksum, and required entrypoints;
+4. materialize a Registry artifact into a checksum-keyed cache when required;
+5. pass `pragma-context-descriptor/v1` and read-only entrypoints to the Codex app-server adapter.
+
+The Agent reads those entrypoints directly. It does not run `pragma design read`, obtain Registry credentials, download artifacts, or follow a newer `current.json` during the turn. `pragma design read` remains a producer smoke-check and human diagnostic command.
+
 ## Quick Start
 
 Generate the sample context:
@@ -127,7 +141,7 @@ Run tests:
 npm test
 ```
 
-## CLI
+## Producer And Diagnostic CLI
 
 ```bash
 node src/cli.js design prepare-figma-capture --url <figma-url> --repo <repo-path> --page <node-id> [--components <node-id>|none] [--assets <node-id>|none] [--json]

@@ -22,7 +22,7 @@ If the full package is stored in Gitea Generic Package Registry, `Package URL` c
 
 `current.json` is written only by a successful non-dry-run publish. Registry dry runs must not advance the current pointer to an artifact that has not been uploaded.
 
-The fragment intentionally does not inline pixel facts. Development Agents must follow the current pointer and manifest entrypoints, then read `normalized/agent-workflow.md`, `normalized/design-context.json`, `normalized/pixel-spec/index.json` plus the needed frame/region shards, `normalized/layers/index.json` plus the needed layer-tree shards, dependencies, assets, tokens, components, render instructions, source evidence, screenshots, and visual baseline from the package.
+The fragment intentionally does not inline pixel facts. Before Codex starts, the Governance Runner follows the current pointer, pins the immutable manifest and emits `pragma-context-descriptor/v1`. Development Agents read the descriptor entrypoints directly, then consume `normalized/agent-workflow.md`, `normalized/design-context.json`, `normalized/pixel-spec/index.json` plus the needed frame/region shards, `normalized/layers/index.json` plus the needed layer-tree shards, dependencies, assets, tokens, components, render instructions, source evidence, screenshots, and visual baseline from the package. Agents do not invoke Pragma CLI or download Registry artifacts.
 
 Legacy aggregate files such as `normalized/pixel-spec.json` and `normalized/layers.json` may be present for compatibility, but the manifest shard indexes are the canonical implementation entrypoints when present.
 
