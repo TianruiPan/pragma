@@ -14,6 +14,7 @@ import { fromFigma } from "./core/from-figma.js";
 import { preflightFigmaCapture } from "./core/preflight.js";
 import { addDesignSourceSnapshot, prepareFigmaCapture, syncDesignSources } from "./core/source-registry.js";
 import { diffDesignContext } from "./core/diff.js";
+import { pragmaVersionPayload } from "./version.js";
 
 function parseArgs(argv) {
   const options = {};
@@ -48,6 +49,7 @@ function parseArgs(argv) {
 function help() {
   return `Pragma 2.0 MVP\n\n` +
     `Commands:\n` +
+    `  pragma --version [--json]\n` +
     `  pragma design prepare-figma-capture --url <figma-url> --repo <repo> --page <node> [--components <node>|none] [--assets <node>|none] [--json]\n` +
     `  pragma design preflight --input <pragma-input> --repo <repo> [--fix] [--json]\n` +
     `  pragma design from-figma --input <pragma-input> --repo <repo> [--force] [--json]\n` +
@@ -76,6 +78,15 @@ async function main(argv) {
   const [scope, command, ...rest] = argv;
   if (!scope || scope === "help" || scope === "--help" || scope === "-h") {
     process.stdout.write(help());
+    return;
+  }
+  if (scope === "--version" || scope === "version" || scope === "-v") {
+    const version = pragmaVersionPayload();
+    if (argv.includes("--json")) {
+      printJson(version);
+    } else {
+      process.stdout.write(`${version.cliVersion}\n`);
+    }
     return;
   }
   if (scope !== "design") {
