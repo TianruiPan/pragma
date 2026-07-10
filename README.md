@@ -2,6 +2,8 @@
 
 This is the active Pragma 2.0 MVP workspace. The previous Pragma 1.0 workspace is archived separately and is not the source of truth for current behavior.
 
+The versioned product requirements are maintained in `pragma-2.0-prd.md`; implementation behavior is defined by this repository's code, schemas, and tests.
+
 Pragma 2.0 MVP is an AI-native design context delivery layer for Gitea issue workflows:
 
 - Designer-side Codex/Figma MCP skills capture design data into a `pragma-input/` directory.
@@ -96,7 +98,7 @@ Shared design source registry in the same target repo:
 Size policy:
 
 - `<= 20MB`: commit the complete context directory to the same repo.
-- `> 20MB` and `<= 100MB`: keep manifest, normalized specs, lightweight indexes, visual baseline, and thumbnails in repo; publish full `context.zip` to Gitea Generic Package Registry.
+- `> 20MB` and `<= 100MB`: keep manifest, normalized specs, lightweight indexes, visual baseline, and thumbnails in repo; publish full `context.zip` to company MinIO.
 - `> 100MB`: not a routine MVP path; reduce or split the context.
 
 ## Agent Read Order
@@ -120,10 +122,10 @@ For `requires_design_issue: true`, the Governance Runner performs this sequence 
 1. pin the workspace commit containing the merged design PR;
 2. resolve `current.json` to an immutable manifest;
 3. verify the repo, Design Issue, linked Dev Issue, version, checksum, and required entrypoints;
-4. materialize a Registry artifact into a checksum-keyed cache when required;
+4. materialize a MinIO object into a checksum-keyed cache when required;
 5. pass `pragma-context-descriptor/v1` and read-only entrypoints to the Codex app-server adapter.
 
-The Agent reads those entrypoints directly. It does not run `pragma design read`, obtain Registry credentials, download artifacts, or follow a newer `current.json` during the turn. `pragma design read` remains a producer smoke-check and human diagnostic command.
+The Agent reads those entrypoints directly. It does not run `pragma design read`, obtain MinIO credentials, download objects, or follow a newer `current.json` during the turn. `pragma design read` remains a producer smoke-check and human diagnostic command.
 
 ## Quick Start
 
@@ -167,20 +169,20 @@ node src/cli.js design validate --repo <repo-path> --source-registry [--file-key
 
 `from-figma` currently expects a Plugin / Capture Bridge-produced `pragma-input/` via `--input` or `--capture-dir`. Without that directory it returns a structured error; Pragma core does not connect to Figma credentials or implement the Plugin UI.
 
-`publish` supports Gitea Generic Package Registry when the package is larger than the threshold:
+`publish` uses MinIO when the package is larger than the threshold. Put publisher credentials in environment variables; do not pass them on the command line:
 
 ```bash
+export PRAGMA_MINIO_PUBLISH_ACCESS_KEY=...
+export PRAGMA_MINIO_PUBLISH_SECRET_KEY=...
 node src/cli.js design publish \
   --context .pragma/design-contexts/issue-102/versions/v1 \
-  --gitea-base-url https://gitea.example.com \
-  --owner example-org \
-  --package-name pragma-design-context \
-  --token-env GITEA_TOKEN \
+  --minio-endpoint http://218.11.1.13:9000 \
+  --minio-bucket product-project-dev-lab \
   --prune-repo
 ```
 
-`--prune-repo` removes large `assets/`, `source/`, and local `context.zip` after a real registry upload, leaving the repo with manifest, normalized specs, handoff notes, visual baseline, and screenshots.
+The deterministic object key is `pragma-design-context/<owner>/<repo>/issue-<design-issue>/<version>/context.zip`. `--prune-repo` removes large `assets/`, `source/`, and local `context.zip` after a real MinIO upload, leaving the repo with manifest, normalized specs, handoff notes, visual baseline, and screenshots.
 
-`current.json` advances only after a non-dry-run publish succeeds. A registry `--dry-run` can prepare and validate the version, but it never marks that version as current.
+`current.json` advances only after a non-dry-run publish succeeds. A MinIO `--dry-run` can prepare and validate the version, but it never marks that version as current.
 
 Pragma only produces context files and markdown fragments. It does not create/update Gitea issues, move issue state, or establish dependencies; those actions belong to the generic Issue writer.

@@ -9,7 +9,7 @@ Pragma follows the simplified Issue model:
 需要 Design Issue：是
 - 开发 Issue 必须依赖同 repo 的 Design Issue。
 - Runner 必须在启动 Codex turn 前从 pinned 默认分支 commit 的 `.pragma/design-contexts/issue-<n>/current.json` 解析当前版本，并向 Agent 提供 `pragma-context-descriptor/v1`。
-- Agent 直接读取 descriptor 的只读 entrypoints，不调用 Pragma CLI，也不获取 Registry credential。
+- Agent 直接读取 descriptor 的只读 entrypoints，不调用 Pragma CLI，也不获取 MinIO credential。
 ```
 
 Blocking message:
