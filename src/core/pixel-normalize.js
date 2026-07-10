@@ -923,7 +923,7 @@ export function buildLayerTreePackage({ layers, frames, pixelSpec, pageRegions }
 export function buildAgentWorkflow() {
   return `# Agent Workflow\n\n` +
     `## Read Gate\n` +
-    `Stop before implementation until manifest.json, normalized/agent-context.md, this workflow, normalized/design-context.json, and the required pixel-spec shards for the target Page Regions have been read. Do not use broad full-package searches as the primary way to find typography or bounds.\n\n` +
+    `In a normal automated development turn, use the Runner-supplied pragma-context-descriptor/v1 and its read-only entrypoints. Do not invoke Pragma CLI, download Registry artifacts, or follow a newer current.json. Stop before implementation until manifest.json, normalized/agent-context.md, this workflow, normalized/design-context.json, and the required pixel-spec shards for the target Page Regions have been read. Do not use broad full-package searches as the primary way to find typography or bounds.\n\n` +
     `## Typography\n` +
     `Read Page Regions from normalized/design-context.json, then open normalized/pixel-spec/index.json and only the region shards listed by the target regions. Typography facts live in region shard nodes[].text and must be preserved from resolvedValue even when tokenId is absent.\n\n` +
     `## Progressive Disclosure Rules\n` +

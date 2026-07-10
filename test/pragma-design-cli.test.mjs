@@ -178,6 +178,8 @@ test("ingest, validate, issue-fragment, read, and asset lookup work", async () =
   const agentWorkflow = await fs.readFile(path.join(contextDir, "normalized", "agent-workflow.md"), "utf8");
   assert.match(agentWorkflow, /Progressive Disclosure Rules/);
   assert.match(agentWorkflow, /Business Data Safety/);
+  assert.match(agentWorkflow, /pragma-context-descriptor\/v1/);
+  assert.match(agentWorkflow, /Do not invoke Pragma CLI/);
   const designContext = await readJson(path.join(contextDir, "normalized", "design-context.json"));
   assert.equal(Array.isArray(designContext.pageRegions), true);
   assert.equal(designContext.pageRegions.length > 0, true);

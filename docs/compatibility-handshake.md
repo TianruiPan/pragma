@@ -1,6 +1,6 @@
 # Compatibility Handshake
 
-Deployments and downstream contract tests must verify the installed Pragma artifact before invoking design commands:
+Producer, publisher, test, or diagnostic deployments that invoke Pragma commands must verify the installed artifact first:
 
 ```powershell
 pragma --version --json
@@ -13,6 +13,8 @@ The response includes:
 - Governance/Pragma integration contract version;
 - optional build commit.
 
-Local checkouts may leave `buildCommit` null. Pilot and production artifacts must inject `PRAGMA_BUILD_COMMIT`, and the consuming deployment must pin and compare it before dispatching Pragma-backed work.
+Local checkouts may leave `buildCommit` null. Pilot and production producer artifacts must inject `PRAGMA_BUILD_COMMIT`, and the invoking producer/publisher deployment must pin and compare it before running design commands.
+
+Development consumption does not use this CLI handshake. The Governance Runner consumes schema `2.0` files through `pragma-integration/v1`, emits `pragma-context-descriptor/v1`, and starts Codex only after native resolution succeeds. Developer machines, Codex app-server, and development Agents do not require an installed Pragma artifact.
 
 The current cross-repository boundary is `pragma-integration/v1` and uses Pragma schema `2.0`.
