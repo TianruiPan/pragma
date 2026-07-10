@@ -1,0 +1,91 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-layer-tree-frame",
+  "id": "layers-frame-map-monitoring-page",
+  "frame": {
+    "id": "frame-map-monitoring-page",
+    "figmaNodeId": "1:23",
+    "name": "Map monitoring page",
+    "rootLayerId": "node-1-23"
+  },
+  "rootNodeIds": [
+    "node-1-23"
+  ],
+  "nodes": [
+    {
+      "id": "node-1-23",
+      "figmaNodeId": "1:23",
+      "normalizedNodeId": "node-1-23",
+      "name": "Map Monitoring Page",
+      "type": "FRAME",
+      "children": [
+        "node-1-24",
+        "node-1-30",
+        "node-1-40",
+        "node-1-50"
+      ],
+      "sourceOrder": 0,
+      "pixelRef": "normalized/pixel-spec/frames/frame-map-monitoring-page.json#nodes/node-1-23"
+    },
+    {
+      "id": "node-1-24",
+      "figmaNodeId": "1:24",
+      "normalizedNodeId": "node-1-24",
+      "name": "Top Filter Bar",
+      "type": "FRAME",
+      "parentId": "node-1-23",
+      "children": [
+        "node-1-25"
+      ],
+      "sourceOrder": 1,
+      "pixelRef": "normalized/pixel-spec/frames/frame-map-monitoring-page.json#nodes/node-1-24",
+      "pageRegionId": "region-top-filter-bar-node-1-24"
+    },
+    {
+      "id": "node-1-30",
+      "figmaNodeId": "1:30",
+      "normalizedNodeId": "node-1-30",
+      "name": "Dynamic Map Surface",
+      "type": "FRAME",
+      "parentId": "node-1-23",
+      "children": [],
+      "sourceOrder": 3,
+      "pixelRef": "normalized/pixel-spec/frames/frame-map-monitoring-page.json#nodes/node-1-30",
+      "pageRegionId": "region-dynamic-map-surface-node-1-30"
+    },
+    {
+      "id": "node-1-40",
+      "figmaNodeId": "1:40",
+      "normalizedNodeId": "node-1-40",
+      "name": "Drone Marker Icon",
+      "type": "IMAGE",
+      "parentId": "node-1-23",
+      "children": [],
+      "sourceOrder": 4,
+      "pixelRef": "normalized/pixel-spec/frames/frame-map-monitoring-page.json#nodes/node-1-40"
+    },
+    {
+      "id": "node-1-50",
+      "figmaNodeId": "1:50",
+      "normalizedNodeId": "node-1-50",
+      "name": "Right Event Drawer",
+      "type": "FRAME",
+      "parentId": "node-1-23",
+      "children": [],
+      "sourceOrder": 5,
+      "pixelRef": "normalized/pixel-spec/frames/frame-map-monitoring-page.json#nodes/node-1-50",
+      "pageRegionId": "region-right-event-drawer-node-1-50"
+    },
+    {
+      "id": "node-1-25",
+      "figmaNodeId": "1:25",
+      "normalizedNodeId": "node-1-25",
+      "name": "Filter Label",
+      "type": "TEXT",
+      "parentId": "node-1-24",
+      "children": [],
+      "sourceOrder": 2,
+      "pixelRef": "normalized/pixel-spec/frames/frame-map-monitoring-page.json#nodes/node-1-25"
+    }
+  ]
+}

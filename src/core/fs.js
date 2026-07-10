@@ -126,7 +126,8 @@ export async function resetDirIfSafe(dir) {
   const parts = normalized.split(path.sep).map((part) => part.toLowerCase());
   const insidePragmaDesignContexts = parts.includes(".pragma") && parts.includes("design-contexts");
   const issueLike = path.basename(normalized).startsWith("issue-");
-  if (!insidePragmaDesignContexts || !issueLike) {
+  const versionLike = /^v\d+$/i.test(path.basename(normalized)) && path.basename(path.dirname(normalized)).toLowerCase() === "versions";
+  if (!insidePragmaDesignContexts || (!issueLike && !versionLike)) {
     throw new Error(`Refusing to reset unsafe context directory: ${dir}`);
   }
   await fs.rm(normalized, { recursive: true, force: true });

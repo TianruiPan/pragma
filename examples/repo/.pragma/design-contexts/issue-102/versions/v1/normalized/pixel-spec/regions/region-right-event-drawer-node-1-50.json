@@ -1,0 +1,121 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-pixel-spec-region",
+  "id": "design-issue-102-v1-region-right-event-drawer-node-1-50",
+  "region": {
+    "id": "region-right-event-drawer-node-1-50",
+    "name": "Right Event Drawer",
+    "frameId": "frame-map-monitoring-page",
+    "role": "content",
+    "semanticLabel": "Right Event Drawer",
+    "confidence": 0.72,
+    "layerRefs": [
+      "node-1-50"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "node-1-50",
+      "figmaNodeId": "1:50",
+      "layerRef": "node-1-50",
+      "name": "Right Event Drawer",
+      "type": "frame",
+      "zIndex": 5,
+      "bounds": {
+        "x": 1544,
+        "y": 96,
+        "width": 352,
+        "height": 880
+      },
+      "layout": {
+        "position": "absolute",
+        "overflow": "visible"
+      },
+      "fills": [
+        {
+          "type": "solid",
+          "color": {
+            "tokenId": "color-surface-panel",
+            "resolvedValue": "#0D2636"
+          },
+          "opacity": 0.88
+        }
+      ],
+      "strokes": [],
+      "radius": {
+        "resolvedValue": {
+          "topLeft": 16,
+          "topRight": 16,
+          "bottomRight": 16,
+          "bottomLeft": 16
+        }
+      },
+      "shadow": [],
+      "opacity": 1,
+      "blendMode": "normal",
+      "text": null,
+      "assetBinding": {
+        "nodeId": "node-1-50",
+        "figmaNodeId": "1:50",
+        "assetId": "asset-panel-bg",
+        "fit": "cover",
+        "crop": {
+          "x": 0,
+          "y": 0,
+          "width": 1,
+          "height": 1
+        },
+        "placement": {
+          "x": 1544,
+          "y": 96,
+          "width": 352,
+          "height": 880
+        },
+        "sourceNodeIds": [
+          "node-1-50"
+        ],
+        "usedByNodeIds": [
+          "node-1-50"
+        ],
+        "scope": "page"
+      },
+      "componentRef": {
+        "componentId": "component-warning-card",
+        "variant": {
+          "severity": "normal"
+        }
+      },
+      "state": "default",
+      "availableStates": []
+    }
+  ],
+  "assetBindings": [
+    {
+      "nodeId": "node-1-50",
+      "figmaNodeId": "1:50",
+      "assetId": "asset-panel-bg",
+      "fit": "cover",
+      "crop": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      },
+      "placement": {
+        "x": 1544,
+        "y": 96,
+        "width": 352,
+        "height": 880
+      },
+      "sourceNodeIds": [
+        "node-1-50"
+      ],
+      "usedByNodeIds": [
+        "node-1-50"
+      ],
+      "scope": "page"
+    }
+  ],
+  "availableStates": [],
+  "dynamicRegions": []
+}

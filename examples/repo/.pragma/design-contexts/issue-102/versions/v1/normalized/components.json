@@ -12,6 +12,8 @@
       "variant": {
         "size": "default"
       },
+      "availableStates": [],
+      "hidden": false,
       "optional": false,
       "external": false
     },
@@ -25,6 +27,8 @@
       "variant": {
         "severity": "normal"
       },
+      "availableStates": [],
+      "hidden": false,
       "optional": false,
       "external": false
     }
@@ -46,6 +50,8 @@
         }
       ],
       "states": [],
+      "visualStateSources": [],
+      "stateFrames": [],
       "optional": false,
       "external": false
     },
@@ -62,9 +68,13 @@
         }
       ],
       "states": [],
+      "visualStateSources": [],
+      "stateFrames": [],
       "optional": false,
       "external": false
     }
   ],
+  "visualStateSources": [],
+  "stateFrames": [],
   "codeConnect": []
 }

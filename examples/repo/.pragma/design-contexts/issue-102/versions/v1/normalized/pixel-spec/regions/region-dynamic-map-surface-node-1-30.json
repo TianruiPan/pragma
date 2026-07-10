@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-pixel-spec-region",
+  "id": "design-issue-102-v1-region-dynamic-map-surface-node-1-30",
+  "region": {
+    "id": "region-dynamic-map-surface-node-1-30",
+    "name": "Dynamic Map Surface",
+    "frameId": "frame-map-monitoring-page",
+    "role": "dynamic-map",
+    "semanticLabel": "Dynamic Map Surface",
+    "confidence": 0.95,
+    "layerRefs": [
+      "node-1-30"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "node-1-30",
+      "figmaNodeId": "1:30",
+      "layerRef": "node-1-30",
+      "name": "Dynamic Map Surface",
+      "type": "frame",
+      "zIndex": 3,
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "layout": {
+        "position": "absolute",
+        "overflow": "visible"
+      },
+      "fills": [
+        {
+          "type": "solid",
+          "color": {
+            "resolvedValue": "#09202E"
+          },
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "radius": null,
+      "shadow": [],
+      "opacity": 1,
+      "blendMode": "normal",
+      "text": null,
+      "assetBinding": null,
+      "componentRef": null,
+      "state": "default",
+      "availableStates": []
+    }
+  ],
+  "assetBindings": [],
+  "availableStates": [],
+  "dynamicRegions": [
+    {
+      "id": "region-dynamic-map-surface-node-1-30-dynamic",
+      "pageRegionId": "region-dynamic-map-surface-node-1-30",
+      "name": "Dynamic Map Surface",
+      "type": "map",
+      "nodeIds": [
+        "node-1-30"
+      ],
+      "rendering": "implementation-defined",
+      "pixelMatchRequired": false,
+      "notes": "The center map uses the production map service. Treat the Figma map as an intent reference for control placement, visual balance, and overlay density."
+    }
+  ]
+}

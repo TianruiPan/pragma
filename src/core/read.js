@@ -2,22 +2,28 @@ import path from "node:path";
 import { DesignContextBlockedError, CliError } from "./errors.js";
 import { pathExists, readJson, readText } from "./fs.js";
 import { assertValidDesignContext } from "./validate.js";
+import { manifestChecksum, resolveVersionContext } from "./versioning.js";
 
-const BLOCKING_HINT = "请等待设计交付完成，或将设计分类调整为 design/reference / design/none。";
+const BLOCKING_HINT = "请等待 Design Issue 交付、确认设计 PR 已合入默认分支，或将开发 Issue 标记为“需要 Design Issue：否”。";
 
-function parseDesignCategory(text) {
-  const direct = text.match(/设计分类\s*[:：]\s*(design\/(?:none|reference|context))/i);
-  if (direct) return direct[1].toLowerCase();
-  const label = text.match(/design\/(?:none|reference|context)/i);
-  return label ? label[0].toLowerCase() : undefined;
+function parseNeedsDesignIssue(text) {
+  const match = text.match(/需要\s*Design\s*Issue\s*[:：]\s*(是|否|yes|no|true|false)/i);
+  if (!match) {
+    const legacy = text.match(/design\/(?:none|reference|context)/i)?.[0]?.toLowerCase();
+    if (legacy === "design/context") return true;
+    if (legacy) return false;
+    return undefined;
+  }
+  return /^(是|yes|true)$/i.test(match[1]);
 }
 
 function parseDependencyIssue(text) {
   const patterns = [
+    /Design\s+Issue\s*[:：]\s*#?(\d+)/i,
     /Depends\s+on\s+#(\d+)/i,
     /depends_on\s*[:：]\s*#?(\d+)/i,
-    /设计依赖[\s\S]*?#(\d+)/i,
-    /依赖[\s\S]{0,50}#(\d+)/i
+    /依赖[\s\S]{0,50}#(\d+)/i,
+    /Design\s+Issue[\s\S]{0,30}#(\d+)/i
   ];
   for (const pattern of patterns) {
     const match = text.match(pattern);
@@ -27,86 +33,96 @@ function parseDependencyIssue(text) {
 }
 
 function parseManifestRef(text) {
-  const match = text.match(/Manifest\s*[:：]\s*`?([^`\n]+manifest\.json)`?/i);
+  const match = text.match(/Current\s+Manifest\s*[:：]\s*`?([^`\n]+manifest\.json)`?/i)
+    || text.match(/Manifest\s*[:：]\s*`?([^`\n]+manifest\.json)`?/i);
   return match ? match[1].trim() : undefined;
 }
 
 function blockingMessage(issueNumber) {
   const issueText = issueNumber ? ` #${issueNumber}` : "";
-  return `该开发 Issue 标记为 design/context，但依赖的 Design Context Issue${issueText} 尚未交付 Pragma Context。\n${BLOCKING_HINT}`;
+  return `该开发 Issue 标记为“需要 Design Issue：是”，但依赖的 Design Issue${issueText} 尚未提供可读取的 current pointer / manifest，或设计 PR 尚未合入当前分支。\n${BLOCKING_HINT}`;
 }
 
 async function contextFromDevIssue(options) {
   const devIssuePath = path.resolve(String(options["dev-issue-file"] || options.devIssueFile));
   const text = await readText(devIssuePath);
-  const category = parseDesignCategory(text);
-  if (category !== "design/context") {
-    return { required: false, category: category || "design/none" };
+  const needsDesignIssue = parseNeedsDesignIssue(text);
+  if (needsDesignIssue === false || needsDesignIssue === undefined) {
+    return { required: false, needsDesignIssue: Boolean(needsDesignIssue) };
   }
   const dependencyIssue = parseDependencyIssue(text);
-  if (!dependencyIssue) {
-    throw new DesignContextBlockedError(blockingMessage(undefined));
-  }
+  if (!dependencyIssue) throw new DesignContextBlockedError(blockingMessage(undefined));
   const repoPath = path.resolve(String(options.repo || process.cwd()));
-  const contextDir = path.join(repoPath, ".pragma", "design-contexts", `issue-${dependencyIssue}`);
-  if (!(await pathExists(path.join(contextDir, "manifest.json")))) {
-    throw new DesignContextBlockedError(blockingMessage(dependencyIssue));
+  try {
+    return { required: true, dependencyIssue, ...(await resolveVersionContext({ repo: repoPath, issue: dependencyIssue, version: options.version })) };
+  } catch (error) {
+    if (error instanceof CliError && error.code === "PRAGMA_DESIGN_CONTEXT_BLOCKED") {
+      throw new DesignContextBlockedError(blockingMessage(dependencyIssue));
+    }
+    throw error;
   }
-  return { required: true, category, dependencyIssue, contextDir };
 }
 
-async function resolveContextDir(options) {
-  if (options.context) return path.resolve(String(options.context));
-  if (options.manifest) return path.dirname(path.resolve(String(options.manifest)));
+async function resolveReadContext(options) {
   if (options["dev-issue-file"] || options.devIssueFile) {
     const result = await contextFromDevIssue(options);
     if (!result.required) return result;
-    return result.contextDir;
+    return result;
   }
   if (options["design-issue-file"] || options.designIssueFile) {
     const designIssuePath = path.resolve(String(options["design-issue-file"] || options.designIssueFile));
     const text = await readText(designIssuePath);
     const ref = parseManifestRef(text);
-    if (!ref) throw new CliError(`No Manifest reference found in ${designIssuePath}`);
+    if (!ref) throw new CliError(`No Current Manifest reference found in ${designIssuePath}`);
     const repoPath = path.resolve(String(options.repo || process.cwd()));
-    return path.dirname(path.resolve(repoPath, ref));
+    return resolveVersionContext({ manifest: path.resolve(repoPath, ref) });
   }
-  if (options.repo && options.issue) {
-    return path.resolve(String(options.repo), ".pragma", "design-contexts", `issue-${Number(options.issue)}`);
-  }
-  throw new CliError("Use --context, --manifest, --repo --issue, --dev-issue-file, or --design-issue-file.");
+  return resolveVersionContext(options);
 }
 
 export async function readDesignContext(options) {
-  const resolved = await resolveContextDir(options);
+  const resolved = await resolveReadContext(options);
   if (resolved && typeof resolved === "object" && resolved.required === false) {
     return {
       required: false,
-      category: resolved.category,
-      message: `Design context is not required for ${resolved.category}.`
+      needsDesignIssue: false,
+      message: "Pragma 不介入：该开发 Issue 标记为“需要 Design Issue：否”。"
     };
   }
-  const contextDir = resolved;
+  const contextDir = resolved.contextDir;
   await assertValidDesignContext({ context: contextDir, checkRemote: options["check-remote"] || options.checkRemote });
-  const manifest = await readJson(path.join(contextDir, "manifest.json"));
+  const manifest = await readJson(resolved.manifestPath);
   const agentContextPath = path.join(contextDir, manifest.entrypoints.agentContext);
+  const agentWorkflowPath = manifest.entrypoints.agentWorkflow ? path.join(contextDir, manifest.entrypoints.agentWorkflow) : undefined;
   const designContextPath = path.join(contextDir, manifest.entrypoints.designContext);
   const assetsPath = path.join(contextDir, manifest.entrypoints.assetsManifest);
   const pixelSpecPath = path.join(contextDir, manifest.entrypoints.pixelSpec);
+  const layersPath = manifest.entrypoints.layers ? path.join(contextDir, manifest.entrypoints.layers) : undefined;
   const dependenciesPath = path.join(contextDir, manifest.entrypoints.dependencies);
   const tokensPath = path.join(contextDir, manifest.entrypoints.tokens);
   const componentsPath = path.join(contextDir, manifest.entrypoints.components);
   const renderInstructionsPath = path.join(contextDir, manifest.entrypoints.renderInstructions);
   const visualBaselinePath = path.join(contextDir, manifest.entrypoints.visualBaseline);
   const agentContext = await readText(agentContextPath);
+  const manifestDigest = await manifestChecksum(resolved.manifestPath);
+  const checksum = manifest.packageChecksum || manifestDigest;
   return {
     required: true,
     contextDir,
-    manifestPath: path.join(contextDir, "manifest.json"),
+    issueRoot: resolved.issueRoot,
+    version: manifest.version,
+    versionNumber: manifest.versionNumber,
+    manifestPath: resolved.manifestPath,
+    checksum,
+    manifestChecksum: manifestDigest,
+    packageChecksum: manifest.packageChecksum,
+    currentPath: resolved.issueRoot ? path.join(resolved.issueRoot, "current.json") : undefined,
     agentContextPath,
+    agentWorkflowPath,
     designContextPath,
     assetsPath,
     pixelSpecPath,
+    layersPath,
     dependenciesPath,
     tokensPath,
     componentsPath,

@@ -1,12 +1,18 @@
 {
   "schemaVersion": "2.0",
   "kind": "pragma-design-context-package",
-  "id": "design-context-issue-102-v1",
-  "version": "issue-102-v1",
+  "id": "design-issue-102-v1",
+  "version": "v1",
+  "versionNumber": 1,
+  "supersedes": null,
+  "changeSummary": "Initial design context for issue #102.",
+  "sourceChecksum": "sha256:d3d15deb1e3fc52656db6eee5bb5e81224b87ad353d18bc10d4016fa1a703ffc",
+  "packageChecksum": "sha256:d33679b523993e803888bbd3a1eecee58524894ed33c54772084f4c2304ee999",
   "issue": {
     "provider": "gitea",
     "repo": "example-org/flight-ops-console",
     "number": 102,
+    "type": "design",
     "title": "Map monitoring page design context",
     "targetDevIssues": [
       {
@@ -14,6 +20,14 @@
         "title": "Implement map monitoring page"
       }
     ]
+  },
+  "linkedDevelopmentIssues": [
+    101
+  ],
+  "compatibility": {
+    "breakingChange": false,
+    "requiresDevIssueReview": false,
+    "reason": "initial version"
   },
   "source": {
     "provider": "figma",
@@ -23,7 +37,7 @@
       "1:23"
     ],
     "capturedAt": "2026-07-06T10:00:00+08:00",
-    "sourceChecksum": "sha256:150aa9e65c0c8105bcb2c82dd133cc64e21df0926e63821894810ca923f24183",
+    "sourceChecksum": "sha256:d3d15deb1e3fc52656db6eee5bb5e81224b87ad353d18bc10d4016fa1a703ffc",
     "url": "https://www.figma.com/design/demoFigmaFileKey/Demo?node-id=1-23",
     "originalNodeId": "1:23"
   },
@@ -31,9 +45,10 @@
     "humanHandoff": "handoff/README.md",
     "lanhuUrl": "https://lanhuapp.com/demo/project/map-monitoring",
     "agentContext": "normalized/agent-context.md",
+    "agentWorkflow": "normalized/agent-workflow.md",
     "designContext": "normalized/design-context.json",
-    "pixelSpec": "normalized/pixel-spec.json",
-    "layers": "normalized/layers.json",
+    "pixelSpec": "normalized/pixel-spec/index.json",
+    "layers": "normalized/layers/index.json",
     "tokens": "normalized/tokens.json",
     "components": "normalized/components.json",
     "dependencies": "normalized/dependencies.json",
@@ -46,6 +61,12 @@
   },
   "artifact": {
     "storage": "repo",
-    "path": ".pragma/design-contexts/issue-102"
+    "owner": "example-org",
+    "packageName": "pragma-design-context",
+    "packageVersion": "issue-102-v1",
+    "fileName": null,
+    "downloadUrl": null,
+    "checksum": "sha256:d33679b523993e803888bbd3a1eecee58524894ed33c54772084f4c2304ee999",
+    "path": ".pragma/design-contexts/issue-102/versions/v1"
   }
 }

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-design-context-current",
+  "designIssue": {
+    "provider": "gitea",
+    "repo": "example-org/flight-ops-console",
+    "number": 102
+  },
+  "currentVersion": "v1",
+  "currentManifest": "versions/v1/manifest.json",
+  "updatedAt": "2026-07-09T02:35:45.341Z",
+  "updatedBy": "pragma design publish",
+  "reason": "designer-published-new-context"
+}

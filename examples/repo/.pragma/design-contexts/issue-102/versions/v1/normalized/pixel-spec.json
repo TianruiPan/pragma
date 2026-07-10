@@ -1,7 +1,7 @@
 {
   "schemaVersion": "2.0",
   "kind": "pragma-pixel-spec",
-  "id": "design-context-issue-102-v1",
+  "id": "design-issue-102-v1",
   "viewport": {
     "width": 1920,
     "height": 1080,
@@ -42,7 +42,8 @@
       "text": null,
       "assetBinding": null,
       "componentRef": null,
-      "state": "default"
+      "state": "default",
+      "availableStates": []
     },
     {
       "id": "node-1-24",
@@ -108,7 +109,8 @@
           "size": "default"
         }
       },
-      "state": "default"
+      "state": "default",
+      "availableStates": []
     },
     {
       "id": "node-1-25",
@@ -157,7 +159,8 @@
       },
       "assetBinding": null,
       "componentRef": null,
-      "state": "default"
+      "state": "default",
+      "availableStates": []
     },
     {
       "id": "node-1-30",
@@ -193,7 +196,8 @@
       "text": null,
       "assetBinding": null,
       "componentRef": null,
-      "state": "default"
+      "state": "default",
+      "availableStates": []
     },
     {
       "id": "node-1-40",
@@ -230,10 +234,18 @@
           "y": 520,
           "width": 32,
           "height": 32
-        }
+        },
+        "sourceNodeIds": [
+          "node-1-40"
+        ],
+        "usedByNodeIds": [
+          "node-1-40"
+        ],
+        "scope": "page"
       },
       "componentRef": null,
-      "state": "default"
+      "state": "default",
+      "availableStates": []
     },
     {
       "id": "node-1-50",
@@ -291,7 +303,14 @@
           "y": 96,
           "width": 352,
           "height": 880
-        }
+        },
+        "sourceNodeIds": [
+          "node-1-50"
+        ],
+        "usedByNodeIds": [
+          "node-1-50"
+        ],
+        "scope": "page"
       },
       "componentRef": {
         "componentId": "component-warning-card",
@@ -299,45 +318,18 @@
           "severity": "normal"
         }
       },
-      "state": "default"
+      "state": "default",
+      "availableStates": []
     }
   ],
-  "states": [
-    {
-      "name": "default",
-      "nodeIds": [
-        "node-1-23",
-        "node-1-24",
-        "node-1-25",
-        "node-1-30",
-        "node-1-40",
-        "node-1-50"
-      ]
-    },
-    {
-      "name": "loading",
-      "nodeIds": []
-    },
-    {
-      "name": "error",
-      "nodeIds": []
-    },
-    {
-      "name": "empty",
-      "nodeIds": []
-    },
-    {
-      "name": "disabled",
-      "nodeIds": []
-    }
-  ],
+  "states": [],
   "dynamicRegions": [
     {
-      "id": "region-dynamic-1",
-      "name": "Implementation-defined visual region",
+      "id": "region-dynamic-map-surface-node-1-30-dynamic",
+      "pageRegionId": "region-dynamic-map-surface-node-1-30",
+      "name": "Dynamic Map Surface",
       "type": "map",
       "nodeIds": [
-        "node-1-23",
         "node-1-30"
       ],
       "rendering": "implementation-defined",

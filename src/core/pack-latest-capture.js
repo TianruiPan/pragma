@@ -5,6 +5,7 @@ import { isPathInside, pathExists, readJson, safeJoin, writeJson } from "./fs.js
 import { packFromFigmaCapture } from "./pack-from-figma-capture.js";
 import { preflightFigmaCapture } from "./preflight.js";
 import { emptyTimings, preflightSummary, timeStage } from "./timing.js";
+import { chooseVersion, issueRootDir, versionDirForIssue } from "./versioning.js";
 
 function positiveIssueNumber(value) {
   const issue = Number(value);
@@ -123,24 +124,22 @@ export async function resolveLatestCaptureInput(options) {
   };
 }
 
-function contextDirForIssue(repoRoot, issue) {
-  return safeJoin(repoRoot, ".pragma", "design-contexts", `issue-${issue}`);
-}
-
-async function assertCanWriteContext({ repoRoot, issue, force }) {
-  const contextDir = contextDirForIssue(repoRoot, issue);
+async function assertCanWriteContext({ repoRoot, issue, force, version, bump }) {
+  const issueRoot = issueRootDir(repoRoot, issue);
+  const chosenVersion = await chooseVersion({ issueRoot, requestedVersion: version, bump });
+  const contextDir = versionDirForIssue(repoRoot, issue, chosenVersion.version);
   if (!isPathInside(path.join(repoRoot, ".pragma", "design-contexts"), contextDir)) {
     throw new CliError("Resolved context path is outside .pragma/design-contexts.", 1, "PRAGMA_UNSAFE_CONTEXT_PATH", { contextDir });
   }
   if ((await pathExists(contextDir)) && !force) {
     throw new CliError(
-      `Context already exists: ${contextDir}. Pass --force to overwrite it.`,
+      `Context version already exists: ${contextDir}. Pass --force to overwrite it or --bump auto to create a new version.`,
       2,
       "PRAGMA_CONTEXT_EXISTS",
-      { contextDir, issue }
+      { contextDir, issue, version: chosenVersion.version }
     );
   }
-  return contextDir;
+  return { contextDir, version: chosenVersion.version };
 }
 
 function boolOption(options, key) {
@@ -221,12 +220,13 @@ export async function packLatestCapture(options) {
     };
   }
 
-  await assertCanWriteContext({ repoRoot: resolved.repoRoot, issue: resolved.issue, force });
+  const target = await assertCanWriteContext({ repoRoot: resolved.repoRoot, issue: resolved.issue, force, version: options.version, bump: options.bump });
   const packed = await packFromFigmaCapture({
     ...options,
     input: resolved.inputPath,
     repo: resolved.repoRoot,
     issue: resolved.issue,
+    version: target.version,
     force
   });
   timings.resolveInputMs = Math.round(((timings.resolveInputMs || 0) + (packed.timings?.resolveInputMs || 0)) * 100) / 100;

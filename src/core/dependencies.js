@@ -20,11 +20,32 @@ function defaultRules(lock = {}) {
 
 function normalizePageFrame(frame, capturedAt, index) {
   const nodeId = normalizeFigmaNodeId(frame.nodeId || frame.figmaNodeId || frame.id || frame) || `page:${index + 1}`;
-  return {
+  const bounds = typeof frame === "object" ? (frame.bounds || frame.absoluteBoundingBox) : undefined;
+  const viewport = typeof frame === "object"
+    ? (frame.viewport || (bounds || frame.width || frame.height ? {
+      width: frame.width ?? bounds?.width,
+      height: frame.height ?? bounds?.height
+    } : undefined))
+    : undefined;
+  const normalized = {
     nodeId,
     name: typeof frame === "object" ? frame.name : undefined,
     snapshotId: typeof frame === "object" && frame.snapshotId ? frame.snapshotId : `page-${figmaNodeIdForPath(nodeId)}-${shortSha(`${nodeId}:${capturedAt}`)}`
   };
+  if (typeof frame === "object") {
+    if (frame.role) normalized.role = frame.role;
+    if (frame.type || frame.nodeType) normalized.type = frame.type || frame.nodeType;
+    if (frame.url) normalized.url = frame.url;
+    if (bounds) normalized.bounds = bounds;
+    if (viewport) normalized.viewport = viewport;
+    const width = frame.width ?? bounds?.width ?? viewport?.width;
+    const height = frame.height ?? bounds?.height ?? viewport?.height;
+    if (width !== undefined || height !== undefined) {
+      normalized.width = width;
+      normalized.height = height;
+    }
+  }
+  return normalized;
 }
 
 function normalizeStatus(value, fallback = "none") {
@@ -50,10 +71,10 @@ function normalizeRole(role, input = undefined) {
   return entry;
 }
 
-export function buildDependencies({ dependencyLock = {}, capture = {}, selectionNodes = [] }) {
+export function buildDependencies({ dependencyLock = {}, capture = {}, selectionNodes = [], selectionFrames = {} }) {
   const capturedAt = dependencyLock.capturedAt || capture.capturedAt || new Date().toISOString();
   const fileKey = dependencyLock.fileKey || capture.figma?.fileKey;
-  const pageCandidates = dependencyLock.pageFrames || dependencyLock.frames?.page || capture.figma?.frames?.page || selectionNodes;
+  const pageCandidates = dependencyLock.pageFrames || dependencyLock.frames?.page || capture.figma?.frames?.page || selectionFrames.page || selectionNodes;
   return {
     schemaVersion: "2.0",
     kind: "pragma-design-dependencies",

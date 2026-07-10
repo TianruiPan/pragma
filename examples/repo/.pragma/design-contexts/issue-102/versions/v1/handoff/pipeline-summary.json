@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-pipeline-summary",
+  "command": "design pack-from-figma-capture",
+  "generatedAt": "2026-07-09T02:35:45.543Z",
+  "input": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\figma-mcp-input",
+  "repo": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo",
+  "contextDir": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1",
+  "manifestPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1\\manifest.json",
+  "zipPath": "C:\\Users\\97667\\AppData\\Local\\Temp\\pragma-context-zip-EqmroS\\context.zip",
+  "issueFragmentPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1\\handoff\\issue-fragment.md",
+  "issueFragmentChecksum": "sha256:d33679b523993e803888bbd3a1eecee58524894ed33c54772084f4c2304ee999",
+  "artifact": {
+    "storage": "repo",
+    "owner": "example-org",
+    "packageName": "pragma-design-context",
+    "packageVersion": "issue-102-v1",
+    "fileName": null,
+    "downloadUrl": null,
+    "checksum": "sha256:d33679b523993e803888bbd3a1eecee58524894ed33c54772084f4c2304ee999",
+    "path": ".pragma/design-contexts/issue-102/versions/v1"
+  },
+  "preflightSummary": {
+    "repairs": 0,
+    "unresolved": 0,
+    "issues": 0,
+    "status": "ok"
+  },
+  "preflightRepairs": [],
+  "validationWarnings": [
+    "[TOKEN_MAPPING_MISSING_TOKEN_ID] pixel-spec node node-1-23.fills[0].color has resolvedValue but no tokenId",
+    "[TOKEN_MAPPING_MISSING_TOKEN_ID] pixel-spec node node-1-24.strokes[0].color has resolvedValue but no tokenId",
+    "[TOKEN_MAPPING_MISSING_TOKEN_ID] pixel-spec node node-1-30.fills[0].color has resolvedValue but no tokenId",
+    "[TOKEN_MAPPING_MISSING_TOKEN_ID] pixel-spec node node-1-50.radius has resolvedValue but no tokenId",
+    "[TOKEN_MAPPING_MISSING_TOKEN_ID] pixel-spec node node-1-25.text.typography has resolvedValue but no tokenId"
+  ],
+  "readSmokeCheck": {
+    "ok": true,
+    "manifestPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1\\manifest.json",
+    "agentContextPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1\\normalized\\agent-context.md",
+    "agentWorkflowPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1\\normalized\\agent-workflow.md",
+    "designContextPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1\\normalized\\design-context.json",
+    "pixelSpecPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1\\normalized\\pixel-spec\\index.json",
+    "layersPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1\\normalized\\layers\\index.json",
+    "dependenciesPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1\\normalized\\dependencies.json",
+    "assetsPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1\\normalized\\assets.json",
+    "tokensPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1\\normalized\\tokens.json",
+    "componentsPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1\\normalized\\components.json",
+    "renderInstructionsPath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1\\normalized\\render-instructions.md",
+    "visualBaselinePath": "D:\\tianrui_pan\\code\\pragma-2.0\\examples\\repo\\.pragma\\design-contexts\\issue-102\\versions\\v1\\validation\\visual-baseline.json"
+  },
+  "timings": {
+    "resolveInputMs": 0.04,
+    "preflightMs": 17.12,
+    "ingestMs": 174.59,
+    "packZipMs": 1848.55,
+    "publishMs": 96.06,
+    "issueFragmentMs": 70.33,
+    "validateMs": 66.32,
+    "readSmokeCheckMs": 63.83
+  }
+}

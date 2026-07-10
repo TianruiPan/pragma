@@ -6,7 +6,7 @@ import { sha256File } from "./checksum.js";
 import { normalizeFigmaNodeId } from "./figma-url.js";
 import { ensureDir, normalizeRelativePosix, pathExists, safeJoin, writeJson, writeText } from "./fs.js";
 import { sniffAssetFile, typeFromExtension } from "./mime.js";
-import { asArray } from "./normalize.js";
+import { asArray, extractSelectionFrames } from "./normalize.js";
 import { addDesignSourceSnapshot } from "./source-registry.js";
 import { elapsedMs, emptyTimings } from "./timing.js";
 
@@ -401,20 +401,40 @@ function preflightFigmaConsistency({ capture, metadata, selection, lock, report 
 
 function createDefaultDependencyLock({ capture, metadata, selection }) {
   const fileKey = capture?.figma?.fileKey || metadata?.fileKey || selection?.fileKey;
-  const pageNodeIds = [
-    ...asArray(capture?.figma?.nodeIds),
-    ...asArray(selection?.nodes).map((node) => node?.id || node?.nodeId || node?.figmaNodeId || node),
-    ...asArray(selection?.frames?.page).map((frame) => frame?.nodeId || frame?.id || frame)
-  ].map((nodeId) => normalizeFigmaNodeId(nodeId)).filter(Boolean);
-  const uniquePageNodeIds = [...new Set(pageNodeIds)];
+  const pageFrames = [
+    ...asArray(capture?.figma?.nodeIds).map((nodeId) => ({ nodeId })),
+    ...asArray(selection?.nodes).map((node) => typeof node === "string" ? { nodeId: node } : node),
+    ...extractSelectionFrames(selection, "page")
+  ];
+  const seen = new Set();
+  const uniquePageFrames = [];
+  for (const frame of pageFrames) {
+    const nodeId = normalizeFigmaNodeId(frame?.nodeId || frame?.figmaNodeId || frame?.id || frame);
+    if (!nodeId || seen.has(nodeId)) continue;
+    seen.add(nodeId);
+    const bounds = frame?.bounds || frame?.absoluteBoundingBox;
+    const viewport = frame?.viewport || (bounds || frame?.width || frame?.height ? {
+      width: frame?.width ?? bounds?.width,
+      height: frame?.height ?? bounds?.height
+    } : undefined);
+    uniquePageFrames.push({
+      nodeId,
+      name: frame?.name || frame?.nodeName,
+      role: frame?.role,
+      type: frame?.type || frame?.nodeType,
+      bounds,
+      viewport,
+      url: frame?.url
+    });
+  }
   return {
     schemaVersion: "2.0",
     kind: "pragma-dependency-lock",
     fileKey,
     capturedAt: capture?.capturedAt || new Date().toISOString(),
-    pageFrames: uniquePageNodeIds.map((nodeId) => ({
-      nodeId,
-      snapshotId: `page-${nodeId.replace(/:/g, "-")}-capture`
+    pageFrames: uniquePageFrames.map((frame) => ({
+      ...frame,
+      snapshotId: `page-${frame.nodeId.replace(/:/g, "-")}-capture`
     })),
     components: { status: "none" },
     assets: { status: "none" },

@@ -13,6 +13,7 @@ import { enrichAgentContext } from "./core/enrich.js";
 import { fromFigma } from "./core/from-figma.js";
 import { preflightFigmaCapture } from "./core/preflight.js";
 import { addDesignSourceSnapshot, prepareFigmaCapture, syncDesignSources } from "./core/source-registry.js";
+import { diffDesignContext } from "./core/diff.js";
 
 function parseArgs(argv) {
   const options = {};
@@ -52,15 +53,17 @@ function help() {
     `  pragma design from-figma --input <pragma-input> --repo <repo> [--force] [--json]\n` +
     `  pragma design source add --role components|assets --input <dir> --repo <repo> --file-key <key> --frame-node-id <node> [--dry-run] [--json]\n` +
     `  pragma design source sync --input <dir> --repo <repo> --file-key <key> [--components-frame <node>] [--assets-frame <node>] [--dry-run] [--json]\n` +
-    `  pragma design ingest --input <dir> --repo <repo> [--issue 102] [--force]\n` +
+    `  pragma design ingest --input <dir> --repo <repo> [--issue 102] [--version v1|--bump auto] [--force]\n` +
     `  pragma design pack --context <dir> [--zip <path>]\n` +
-    `  pragma design publish --context <dir> [--threshold-mb 20] [--dry-run] [--prune-repo]\n` +
-    `  pragma design issue-fragment --context <dir> [--output fragment.md]\n` +
+    `  pragma design publish --context <version-dir> [--supersedes vN] [--change-summary <file>]\n` +
+    `  pragma design publish --repo <repo> --issue <design-issue> [--version vN|--bump auto] [--supersedes vN] [--change-summary <file>]\n` +
+    `  pragma design issue-fragment --repo <repo> --issue <design-issue> [--version current|vN] [--output fragment.md]\n` +
+    `  pragma design diff --repo <repo> --issue <design-issue> --from v1 --to v2 [--json]\n` +
     `  pragma design pack-from-figma-capture --input <dir> --repo <repo> [--force] [--issue-fragment-output fragment.md]\n` +
     `  pragma design pack-latest-capture --repo <repo> --issue <number> [--input <pragma-input>] [--preflight-only] [--force] [--threshold-mb 20] [--json]\n` +
     `  pragma design enrich --context <dir> --notes <text> [--generated-by <id>] [--model <model>]\n` +
-    `  pragma design read --context <dir> | --repo <repo> --issue 102 | --dev-issue-file issue.md\n` +
-    `  pragma design asset --context <dir> --id <asset-id> [--copy-to <path>]\n` +
+    `  pragma design read --repo <repo> --issue <design-issue> [--version vN] | --dev-issue-file issue.md\n` +
+    `  pragma design asset --context <dir>|--repo <repo> --issue <design-issue> --id <asset-id> [--copy-to <path>]\n` +
     `  pragma design validate --context <dir> [--json]\n` +
     `  pragma design validate --repo <repo> --source-registry [--file-key <fileKey>] [--json]\n`;
 }
@@ -131,15 +134,20 @@ async function main(argv) {
       return;
     }
     case "publish": {
-      if (!options.context) throw new CliError("--context is required for design publish.");
+      if (!options.context && !(options.repo && options.issue)) throw new CliError("--context or --repo --issue is required for design publish.");
       const result = await publishDesignContext(options);
-      printJson({ ok: true, command: "design publish", mode: result.mode, contextDir: result.contextDir, zipPath: result.zipPath, sizeBytes: result.sizeBytes, checksum: result.checksum, artifact: result.manifest.artifact });
+      printJson({ ok: true, command: "design publish", mode: result.mode, contextDir: result.contextDir, currentPath: result.currentPath, version: result.manifest.version, manifestPath: `${result.contextDir}/manifest.json`, zipPath: result.zipPath, sizeBytes: result.sizeBytes, checksum: result.manifest.packageChecksum || result.checksum, artifact: result.manifest.artifact });
       return;
     }
     case "issue-fragment": {
-      if (!options.context) throw new CliError("--context is required for design issue-fragment.");
+      if (!options.context && !(options.repo && options.issue) && !options.manifest) throw new CliError("--context, --manifest, or --repo --issue is required for design issue-fragment.");
       const result = await createIssueFragment(options);
       process.stdout.write(result.markdown);
+      return;
+    }
+    case "diff": {
+      const result = await diffDesignContext(options);
+      printJson(result);
       return;
     }
     case "pack-from-figma-capture": {
@@ -171,10 +179,16 @@ async function main(argv) {
       if (options["summary-only"] || options.summaryOnly) {
         printJson({
           ok: true,
+          version: result.version,
+          checksum: result.checksum,
+          manifestChecksum: result.manifestChecksum,
+          packageChecksum: result.packageChecksum,
           manifestPath: result.manifestPath,
           agentContextPath: result.agentContextPath,
+          agentWorkflowPath: result.agentWorkflowPath,
           designContextPath: result.designContextPath,
           pixelSpecPath: result.pixelSpecPath,
+          layersPath: result.layersPath,
           assetsPath: result.assetsPath,
           dependenciesPath: result.dependenciesPath,
           tokensPath: result.tokensPath,
@@ -185,11 +199,11 @@ async function main(argv) {
         });
         return;
       }
-      process.stdout.write(`# Pragma Design Context\n\nManifest: ${result.manifestPath}\nAgent context: ${result.agentContextPath}\nPixel spec: ${result.pixelSpecPath}\n\n---\n\n${result.agentContext}\n`);
+      process.stdout.write(`# Pragma Design Context\n\nVersion: ${result.version}\nManifest: ${result.manifestPath}\nPackage checksum: ${result.packageChecksum || result.checksum}\nManifest checksum: ${result.manifestChecksum}\nAgent context: ${result.agentContextPath}\nAgent workflow: ${result.agentWorkflowPath || "not provided"}\nPixel spec: ${result.pixelSpecPath}\nLayers: ${result.layersPath || "not provided"}\n\n---\n\n${result.agentContext}\n`);
       return;
     }
     case "asset": {
-      if (!options.context) throw new CliError("--context is required for design asset.");
+      if (!options.context && !(options.repo && options.issue)) throw new CliError("--context or --repo --issue is required for design asset.");
       const result = await resolveDesignAsset(options);
       printJson({ ok: true, command: "design asset", ...result });
       return;

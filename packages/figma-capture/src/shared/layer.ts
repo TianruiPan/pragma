@@ -199,7 +199,7 @@ export interface SerializedLayerNode {
   variantProperties?: Record<string, unknown>;
   componentPropertyDefinitions?: Record<string, unknown>;
   availableStates?: Array<Record<string, unknown>>;
-  imageFillRefs?: Array<{ imageHash: string; scaleMode?: string; filters?: unknown }>; 
+  imageFillRefs?: Array<{ imageHash: string; scaleMode?: string; filters?: unknown }>;
   boundVariables?: unknown;
   explicitVariableModes?: unknown;
   resolvedVariableModes?: unknown;

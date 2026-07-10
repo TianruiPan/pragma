@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-layer-tree-index",
+  "rootNodeIds": [
+    "node-1-23"
+  ],
+  "frames": [
+    {
+      "id": "frame-map-monitoring-page",
+      "figmaNodeId": "1:23",
+      "name": "Map monitoring page",
+      "rootLayerId": "node-1-23",
+      "path": "normalized/layers/frames/frame-map-monitoring-page.tree.json",
+      "nodeCount": 6
+    }
+  ]
+}

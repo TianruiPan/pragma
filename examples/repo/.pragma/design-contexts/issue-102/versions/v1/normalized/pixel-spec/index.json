@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-pixel-spec-index",
+  "id": "design-issue-102-v1",
+  "viewport": {
+    "width": 1920,
+    "height": 1080,
+    "deviceScale": 1
+  },
+  "frames": [
+    {
+      "id": "frame-map-monitoring-page",
+      "figmaNodeId": "1:23",
+      "name": "Map monitoring page",
+      "rootLayerId": "node-1-23",
+      "path": "normalized/pixel-spec/frames/frame-map-monitoring-page.json",
+      "regionIds": [
+        "region-top-filter-bar-node-1-24",
+        "region-dynamic-map-surface-node-1-30",
+        "region-right-event-drawer-node-1-50"
+      ],
+      "nodeCount": 6
+    }
+  ],
+  "regions": [
+    {
+      "id": "region-top-filter-bar-node-1-24",
+      "frameId": "frame-map-monitoring-page",
+      "name": "Top Filter Bar",
+      "role": "header",
+      "confidence": 0.85,
+      "path": "normalized/pixel-spec/regions/region-top-filter-bar-node-1-24.json",
+      "nodeCount": 2,
+      "hasTypography": true
+    },
+    {
+      "id": "region-dynamic-map-surface-node-1-30",
+      "frameId": "frame-map-monitoring-page",
+      "name": "Dynamic Map Surface",
+      "role": "dynamic-map",
+      "confidence": 0.95,
+      "path": "normalized/pixel-spec/regions/region-dynamic-map-surface-node-1-30.json",
+      "nodeCount": 1,
+      "hasTypography": false
+    },
+    {
+      "id": "region-right-event-drawer-node-1-50",
+      "frameId": "frame-map-monitoring-page",
+      "name": "Right Event Drawer",
+      "role": "content",
+      "confidence": 0.72,
+      "path": "normalized/pixel-spec/regions/region-right-event-drawer-node-1-50.json",
+      "nodeCount": 1,
+      "hasTypography": false
+    }
+  ],
+  "dynamicRegions": [
+    {
+      "id": "region-dynamic-map-surface-node-1-30-dynamic",
+      "pageRegionId": "region-dynamic-map-surface-node-1-30",
+      "name": "Dynamic Map Surface",
+      "type": "map",
+      "nodeIds": [
+        "node-1-30"
+      ],
+      "rendering": "implementation-defined",
+      "pixelMatchRequired": false,
+      "notes": "The center map uses the production map service. Treat the Figma map as an intent reference for control placement, visual balance, and overlay density."
+    }
+  ],
+  "availableStates": []
+}

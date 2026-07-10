@@ -835,7 +835,7 @@
   function componentSource(node) {
     return node.role === "components" ? "selected-components-frame" : "page-inline";
   }
-  function componentMetadataFromLayer(node) {
+  function componentMetadataFromLayer(node, parent) {
     return {
       id: node.nodeId,
       nodeId: node.figmaNodeId,
@@ -850,7 +850,7 @@
       hidden: node.hidden,
       locked: node.locked,
       componentRef: node.componentRef,
-      componentSetId: node.type === "COMPONENT" ? node.parentNodeId || node.componentRef?.componentSetId : node.componentRef?.componentSetId,
+      componentSetId: node.type === "COMPONENT" && parent?.type === "COMPONENT_SET" ? parent.figmaNodeId : node.componentRef?.componentSetId,
       componentProperties: node.componentProperties || {},
       variantProperties: node.variantProperties || {},
       componentPropertyDefinitions: node.componentPropertyDefinitions || {},
@@ -866,6 +866,21 @@
     return nodes.filter((node) => typeof node.visible === "boolean" || typeof node.hidden === "boolean").length;
   }
   function styleRecord(style) {
+    const typeStyle = style.type === "TEXT" ? {
+      fontName: plain(style.fontName),
+      fontFamily: style.fontName?.family,
+      fontStyle: style.fontName?.style,
+      fontSize: style.fontSize,
+      letterSpacing: plain(style.letterSpacing),
+      lineHeight: plain(style.lineHeight),
+      paragraphIndent: style.paragraphIndent,
+      paragraphSpacing: style.paragraphSpacing,
+      listSpacing: style.listSpacing,
+      hangingPunctuation: style.hangingPunctuation,
+      hangingList: style.hangingList,
+      textCase: style.textCase,
+      textDecoration: style.textDecoration
+    } : void 0;
     return {
       id: style.id,
       key: style.key,
@@ -874,7 +889,7 @@
       description: style.description,
       remote: style.remote,
       paints: plain(style.paints),
-      typeStyle: plain(style.typeStyle),
+      typeStyle: plain(style.typeStyle) || plain(typeStyle),
       effects: plain(style.effects),
       layoutGrids: plain(style.layoutGrids),
       documentationLinks: plain(style.documentationLinks)
@@ -882,14 +897,15 @@
   }
   function buildComponentsJson(layerTree) {
     const allLayers = flattenSerializedLayers(layerTree.nodes || []);
+    const layersById = new Map(allLayers.map((node) => [node.figmaNodeId, node]));
     const instances = collectComponentInstances(layerTree.nodes || []);
     const visualStateSources = collectVisualStateSources(layerTree.nodes || []);
     const stateFrames = visualStateSources.filter((state) => state.type === "FRAME" || state.type === "SECTION");
     const componentSets = allLayers.filter((node) => node.type === "COMPONENT_SET").map((node) => ({
       ...componentMetadataFromLayer(node),
-      components: allLayers.filter((candidate) => candidate.type === "COMPONENT" && candidate.parentNodeId === node.figmaNodeId).map(componentMetadataFromLayer)
+      components: allLayers.filter((candidate) => candidate.type === "COMPONENT" && candidate.parentNodeId === node.figmaNodeId).map((candidate) => componentMetadataFromLayer(candidate, node))
     }));
-    const components = allLayers.filter((node) => node.type === "COMPONENT").map(componentMetadataFromLayer);
+    const components = allLayers.filter((node) => node.type === "COMPONENT").map((node) => componentMetadataFromLayer(node, node.parentNodeId ? layersById.get(node.parentNodeId) : void 0));
     const componentMetadataMissingCount = instances.filter((instance) => !instance.mainComponentNodeId).length;
     return {
       schemaVersion: "2.0",

@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { normalizeFigmaNodeId } from "./figma-url.js";
 import { pathExists, listFilesRecursive, normalizeRelativePosix, relativePosix, safeJoin } from "./fs.js";
 import { sha256File } from "./checksum.js";
 import { mimeForType, sniffAssetFile, typeFromExtension } from "./mime.js";
@@ -102,8 +103,14 @@ export async function normalizeAssets(contextDir, inputManifest = undefined, ass
         path: outputRel,
         width: metadata.width,
         height: metadata.height,
-        sourceNodeIds: [...new Set(asArray(asset.sourceNodeIds || asset.sourceNodeId).filter(Boolean))],
-        usedByNodeIds: [...new Set(matchingBindings.map((binding) => binding.nodeId).filter(Boolean))],
+        sourceNodeIds: [...new Set([
+          ...asArray(asset.sourceNodeIds || asset.sourceNodeId),
+          ...matchingBindings.flatMap((binding) => asArray(binding.sourceNodeIds || binding.figmaNodeId))
+        ].filter(Boolean).map(String))],
+        usedByNodeIds: [...new Set([
+          ...asArray(asset.usedByNodeIds || asset.usedByNodeId),
+          ...matchingBindings.flatMap((binding) => asArray(binding.usedByNodeIds || binding.nodeId))
+        ].filter(Boolean).map(String))],
         checksum: metadata.checksum,
         required: asset.required !== false
       });
@@ -127,8 +134,8 @@ export async function normalizeAssets(contextDir, inputManifest = undefined, ass
       path: rel,
       width: metadata.width,
       height: metadata.height,
-      sourceNodeIds: [],
-      usedByNodeIds: [...new Set(matchingBindings.map((binding) => binding.nodeId).filter(Boolean))],
+      sourceNodeIds: [...new Set(matchingBindings.flatMap((binding) => asArray(binding.sourceNodeIds || binding.figmaNodeId)).filter(Boolean).map(String))],
+      usedByNodeIds: [...new Set(matchingBindings.flatMap((binding) => asArray(binding.usedByNodeIds || binding.nodeId)).filter(Boolean).map(String))],
       checksum: metadata.checksum,
       required: true
     });
@@ -166,10 +173,53 @@ export async function listContextFiles(contextDir, childDir) {
   return files.map((file) => relativePosix(contextDir, file));
 }
 
+export function extractSelectionFrames(selection, role = "page") {
+  const frames = selection?.frames;
+  const roleFrames = frames && typeof frames === "object" && !Array.isArray(frames)
+    ? frames[role]
+    : (role === "page" ? frames : undefined);
+  const candidates = [
+    ...asArray(roleFrames),
+    ...asArray(selection?.[`${role}Frames`])
+  ];
+  const seen = new Set();
+  const result = [];
+  for (const item of candidates) {
+    const rawId = typeof item === "string" ? item : (item?.nodeId || item?.figmaNodeId || item?.id || item?.key);
+    const nodeId = normalizeFigmaNodeId(rawId);
+    if (!nodeId || seen.has(nodeId)) continue;
+    seen.add(nodeId);
+    if (typeof item === "string") {
+      result.push({ nodeId, figmaNodeId: nodeId, id: nodeId, name: nodeId, role });
+      continue;
+    }
+    const bounds = item.bounds || item.absoluteBoundingBox;
+    const viewport = item.viewport || (bounds || item.width || item.height ? {
+      width: item.width ?? bounds?.width,
+      height: item.height ?? bounds?.height
+    } : undefined);
+    result.push({
+      ...item,
+      id: item.id || nodeId,
+      nodeId,
+      figmaNodeId: item.figmaNodeId || nodeId,
+      name: item.name || item.nodeName || nodeId,
+      type: item.type || item.nodeType,
+      role: item.role || role,
+      bounds,
+      viewport,
+      width: item.width ?? bounds?.width ?? viewport?.width,
+      height: item.height ?? bounds?.height ?? viewport?.height,
+      url: item.url
+    });
+  }
+  return result;
+}
+
 export function extractSelectionNodes(selection, capture) {
   const candidates = [
+    ...extractSelectionFrames(selection, "page"),
     ...asArray(selection?.nodes),
-    ...asArray(selection?.frames),
     ...asArray(selection?.selection),
     ...asArray(capture?.figma?.nodeIds)
   ];
@@ -177,21 +227,28 @@ export function extractSelectionNodes(selection, capture) {
   const nodes = [];
   for (const item of candidates) {
     if (typeof item === "string") {
-      if (!seen.has(item)) {
-        nodes.push({ id: item, name: item });
-        seen.add(item);
+      const id = normalizeFigmaNodeId(item) || item;
+      if (!seen.has(id)) {
+        nodes.push({ id, name: id });
+        seen.add(id);
       }
       continue;
     }
     if (item && typeof item === "object") {
-      const id = item.id || item.nodeId || item.figmaNodeId || item.key;
+      const id = normalizeFigmaNodeId(item.nodeId || item.figmaNodeId || item.id || item.key);
       if (!id || seen.has(id)) continue;
+      const bounds = item.bounds || item.absoluteBoundingBox;
+      const viewport = item.viewport;
       nodes.push({
         id,
         name: item.name || item.nodeName || id,
         type: item.type || item.nodeType,
-        width: item.width || item.absoluteBoundingBox?.width || item.viewport?.width,
-        height: item.height || item.absoluteBoundingBox?.height || item.viewport?.height
+        role: item.role,
+        bounds,
+        viewport,
+        url: item.url,
+        width: item.width ?? bounds?.width ?? viewport?.width,
+        height: item.height ?? bounds?.height ?? viewport?.height
       });
       seen.add(id);
     }

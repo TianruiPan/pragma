@@ -11,7 +11,7 @@
       "diffThreshold": {
         "pixelRatio": 0.02,
         "ignoreRegions": [
-          "region-dynamic-1"
+          "region-dynamic-map-surface-node-1-30-dynamic"
         ],
         "warnOnlyRegions": []
       }

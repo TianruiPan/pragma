@@ -178,7 +178,7 @@ function componentSource(node: any) {
   return node.role === "components" ? "selected-components-frame" : "page-inline";
 }
 
-function componentMetadataFromLayer(node: any) {
+function componentMetadataFromLayer(node: any, parent?: any) {
   return {
     id: node.nodeId,
     nodeId: node.figmaNodeId,
@@ -193,7 +193,9 @@ function componentMetadataFromLayer(node: any) {
     hidden: node.hidden,
     locked: node.locked,
     componentRef: node.componentRef,
-    componentSetId: node.type === "COMPONENT" ? node.parentNodeId || node.componentRef?.componentSetId : node.componentRef?.componentSetId,
+    componentSetId: node.type === "COMPONENT" && parent?.type === "COMPONENT_SET"
+      ? parent.figmaNodeId
+      : node.componentRef?.componentSetId,
     componentProperties: node.componentProperties || {},
     variantProperties: node.variantProperties || {},
     componentPropertyDefinitions: node.componentPropertyDefinitions || {},
@@ -213,6 +215,21 @@ function countVisibilityFacts(nodes: any[]) {
 }
 
 function styleRecord(style: any) {
+  const typeStyle = style.type === "TEXT" ? {
+    fontName: plain(style.fontName),
+    fontFamily: style.fontName?.family,
+    fontStyle: style.fontName?.style,
+    fontSize: style.fontSize,
+    letterSpacing: plain(style.letterSpacing),
+    lineHeight: plain(style.lineHeight),
+    paragraphIndent: style.paragraphIndent,
+    paragraphSpacing: style.paragraphSpacing,
+    listSpacing: style.listSpacing,
+    hangingPunctuation: style.hangingPunctuation,
+    hangingList: style.hangingList,
+    textCase: style.textCase,
+    textDecoration: style.textDecoration
+  } : undefined;
   return {
     id: style.id,
     key: style.key,
@@ -221,7 +238,7 @@ function styleRecord(style: any) {
     description: style.description,
     remote: style.remote,
     paints: plain(style.paints),
-    typeStyle: plain(style.typeStyle),
+    typeStyle: plain(style.typeStyle) || plain(typeStyle),
     effects: plain(style.effects),
     layoutGrids: plain(style.layoutGrids),
     documentationLinks: plain(style.documentationLinks)
@@ -230,6 +247,7 @@ function styleRecord(style: any) {
 
 function buildComponentsJson(layerTree: any) {
   const allLayers = flattenSerializedLayers(layerTree.nodes || []);
+  const layersById = new Map(allLayers.map((node) => [node.figmaNodeId, node]));
   const instances = collectComponentInstances(layerTree.nodes || []);
   const visualStateSources = collectVisualStateSources(layerTree.nodes || []);
   const stateFrames = visualStateSources.filter((state) => state.type === "FRAME" || state.type === "SECTION");
@@ -239,11 +257,11 @@ function buildComponentsJson(layerTree: any) {
       ...componentMetadataFromLayer(node),
       components: allLayers
         .filter((candidate) => candidate.type === "COMPONENT" && candidate.parentNodeId === node.figmaNodeId)
-        .map(componentMetadataFromLayer)
+        .map((candidate) => componentMetadataFromLayer(candidate, node))
     }));
   const components = allLayers
     .filter((node) => node.type === "COMPONENT")
-    .map(componentMetadataFromLayer);
+    .map((node) => componentMetadataFromLayer(node, node.parentNodeId ? layersById.get(node.parentNodeId) : undefined));
   const componentMetadataMissingCount = instances.filter((instance: any) => !instance.mainComponentNodeId).length;
   return {
     schemaVersion: "2.0",

@@ -1,0 +1,138 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-pixel-spec-region",
+  "id": "design-issue-102-v1-region-top-filter-bar-node-1-24",
+  "region": {
+    "id": "region-top-filter-bar-node-1-24",
+    "name": "Top Filter Bar",
+    "frameId": "frame-map-monitoring-page",
+    "role": "header",
+    "semanticLabel": "Region",
+    "confidence": 0.85,
+    "layerRefs": [
+      "node-1-24"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "node-1-24",
+      "figmaNodeId": "1:24",
+      "layerRef": "node-1-24",
+      "name": "Top Filter Bar",
+      "type": "frame",
+      "zIndex": 1,
+      "bounds": {
+        "x": 24,
+        "y": 24,
+        "width": 760,
+        "height": 64
+      },
+      "layout": {
+        "mode": "horizontal",
+        "position": "absolute",
+        "overflow": "visible",
+        "gap": 12,
+        "padding": {
+          "top": 8,
+          "right": 12,
+          "bottom": 8,
+          "left": 12
+        }
+      },
+      "fills": [
+        {
+          "type": "solid",
+          "color": {
+            "tokenId": "color-surface-panel",
+            "resolvedValue": "#0D2636"
+          },
+          "opacity": 0.92
+        }
+      ],
+      "strokes": [
+        {
+          "color": {
+            "resolvedValue": "#2A5D77"
+          },
+          "width": 1,
+          "position": "inside"
+        }
+      ],
+      "radius": {
+        "tokenId": "radius-panel",
+        "resolvedValue": {
+          "topLeft": 12,
+          "topRight": 12,
+          "bottomRight": 12,
+          "bottomLeft": 12
+        }
+      },
+      "shadow": [],
+      "opacity": 1,
+      "blendMode": "normal",
+      "text": null,
+      "assetBinding": null,
+      "componentRef": {
+        "componentId": "component-filter-bar",
+        "variant": {
+          "size": "default"
+        }
+      },
+      "state": "default",
+      "availableStates": []
+    },
+    {
+      "id": "node-1-25",
+      "figmaNodeId": "1:25",
+      "layerRef": "node-1-25",
+      "name": "Filter Label",
+      "type": "text",
+      "zIndex": 2,
+      "bounds": {
+        "x": 48,
+        "y": 44,
+        "width": 96,
+        "height": 24
+      },
+      "layout": {
+        "position": "absolute",
+        "overflow": "visible"
+      },
+      "fills": [],
+      "strokes": [],
+      "radius": null,
+      "shadow": [],
+      "opacity": 1,
+      "blendMode": "normal",
+      "text": {
+        "content": "Region",
+        "fontFamily": "Source Han Sans SC",
+        "fontWeight": 500,
+        "fontSize": 16,
+        "lineHeight": 24,
+        "letterSpacing": 0,
+        "align": "left",
+        "color": {
+          "tokenId": "color-text-primary",
+          "resolvedValue": "#EAF7FF"
+        },
+        "typography": {
+          "resolvedValue": {
+            "fontFamily": "Source Han Sans SC",
+            "fontWeight": 500,
+            "fontSize": 16,
+            "lineHeight": 24,
+            "letterSpacing": 0
+          }
+        }
+      },
+      "assetBinding": null,
+      "componentRef": null,
+      "state": "default",
+      "availableStates": []
+    }
+  ],
+  "assetBindings": [],
+  "availableStates": [],
+  "dynamicRegions": []
+}

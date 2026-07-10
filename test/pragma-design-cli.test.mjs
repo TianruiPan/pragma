@@ -1,4 +1,4 @@
-import test from "node:test";
+﻿import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -7,6 +7,7 @@ import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { parseFigmaUrl } from "../src/core/figma-url.js";
+import { buildComponents } from "../src/core/pixel-normalize.js";
 
 const execFileAsync = promisify(execFile);
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -64,22 +65,36 @@ async function createInputFixture(root) {
     }
   });
   await writeJson(path.join(input, "figma", "metadata.json"), { fileName: "Demo" });
-  await writeJson(path.join(input, "figma", "selection.json"), { nodes: [{ id: "1:23", name: "Main", width: 1440, height: 900 }] });
+  await writeJson(path.join(input, "figma", "selection.json"), {
+    fileKey: "file-key",
+    nodes: [{ id: "1:23", name: "Main", width: 1440, height: 900 }],
+    frames: {
+      page: [{ role: "page", nodeId: "1:23", name: "Main", type: "FRAME", bounds: { x: 0, y: 0, width: 1440, height: 900 }, viewport: { width: 1440, height: 900 }, url: "https://www.figma.com/design/file-key/Demo?node-id=1-23" }]
+    }
+  });
   await fs.mkdir(path.join(input, "figma"), { recursive: true });
 
   await writeJson(path.join(input, "figma", "layers.json"), {
     rootNodeIds: ["1:23"],
     nodes: [
-      { figmaNodeId: "1:23", name: "Main", type: "FRAME", bounds: { x: 0, y: 0, width: 1440, height: 900 }, fills: ["#ffffff"], radius: 4, children: ["1:24", "1:30"] },
-      { figmaNodeId: "1:24", name: "Title", type: "TEXT", bounds: { x: 24, y: 24, width: 160, height: 32 }, text: { content: "Dashboard", fontSize: 24, lineHeight: 32, color: "#ffffff" } },
-      { figmaNodeId: "1:30", name: "Drone icon", type: "IMAGE", bounds: { x: 200, y: 200, width: 32, height: 32 } }
+      { figmaNodeId: "1:23", name: "Main", type: "FRAME", bounds: { x: 0, y: 0, width: 1440, height: 900 }, fills: ["#ffffff"], radius: 4, styleIds: { fillStyleId: "S:surface" }, boundVariables: { fills: [{ id: "VariableID:surface" }] }, children: ["1:20", "1:30", "1:40"] },
+      { figmaNodeId: "1:20", name: "Header panel", type: "FRAME", bounds: { x: 0, y: 0, width: 1440, height: 80 }, children: ["1:24"] },
+      { figmaNodeId: "1:24", name: "Title", type: "TEXT", bounds: { x: 24, y: 24, width: 160, height: 32 }, styleIds: { textStyleId: "S:heading" }, text: { content: "Dashboard", fontStyle: "Semi Bold", fontSize: 24, lineHeight: 32, color: "#ffffff" } },
+      { figmaNodeId: "1:30", name: "Drone icon", type: "IMAGE", bounds: { x: 200, y: 200, width: 32, height: 32 } },
+      { figmaNodeId: "1:40", name: "Primary button", type: "INSTANCE", bounds: { x: 260, y: 200, width: 120, height: 40 }, componentRef: { componentId: "component-button", name: "Button" }, variantProperties: { State: "Pressed" }, componentProperties: { disabled: { value: false } }, availableStates: [{ name: "State", value: "Pressed", source: "figma-variant-property" }] }
     ]
   });
   await writeJson(path.join(input, "asset-bindings.json"), {
-    bindings: [{ assetId: "asset-drone-icon", figmaNodeId: "1:30", fit: "contain", placement: { x: 200, y: 200, width: 32, height: 32 } }]
+    bindings: [{ assetId: "asset-drone-icon", nodeId: "1:30", figmaNodeId: "1:30", sourceNodeIds: ["1:30"], usedByNodeIds: ["1:30"], scope: "page", fit: "contain", placement: { x: 200, y: 200, width: 32, height: 32 }, sourcePaint: { type: "IMAGE", scaleMode: "FILL" } }]
   });
-  await writeJson(path.join(input, "figma", "variables.json"), { colors: { "text.primary": "#ffffff" }, radius: { "radius.sm": 4 } });
-  await writeJson(path.join(input, "figma", "components.json"), { components: [] });
+  await writeJson(path.join(input, "figma", "variables.json"), {
+    colors: { "text.primary": "#ffffff" },
+    radius: { "radius.sm": 4 },
+    variables: [{ id: "VariableID:surface", key: "surface-key", name: "surface.primary", resolvedType: "COLOR", valuesByMode: { default: { r: 1, g: 1, b: 1, a: 1 } }, scopes: ["ALL_FILLS"], description: "Local surface color", remote: false }],
+    styles: [{ id: "S:surface", key: "surface-style", name: "surface/fill", type: "PAINT", paints: [{ type: "SOLID", color: { r: 1, g: 1, b: 1, a: 1 } }] }, { id: "S:heading", key: "heading-style", name: "heading/lg", type: "TEXT", typeStyle: { fontFamily: "Inter", fontStyle: "Semi Bold", fontSize: 24, lineHeight: 32 } }]
+  });
+  await writeJson(path.join(input, "figma", "components.json"), { components: [], visualStateSources: [{ nodeId: "1:40", name: "Primary button", sourceKind: "component-instance" }], stateFrames: [], metadataCompleteness: { visualStateSourceCount: 1, stateFrameCount: 0, componentMetadataMissingCount: 0, visibilityFactsCount: 4 } });
+  await writeJson(path.join(input, "capture-summary.json"), { diagnostics: { styleRefNodeCount: 2, variableRefNodeCount: 1, localVariableCount: 1, localStyleCount: 2, assetBindingCount: 1 } });
   await fs.writeFile(path.join(input, "figma", "get-design-context.md"), "# Raw context\n", "utf8");
   await fs.mkdir(path.join(input, "assets", "icons"), { recursive: true });
   await fs.writeFile(path.join(input, "assets", "icons", "drone.svg"), "<svg></svg>\n", "utf8");
@@ -105,20 +120,81 @@ test("ingest, validate, issue-fragment, read, and asset lookup work", async () =
   const ingest = await run(["design", "ingest", "--input", input, "--repo", repo]);
   const ingestResult = JSON.parse(ingest.stdout);
   assert.equal(ingestResult.ok, true);
-  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102");
+  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102", "versions", "v1");
 
   const validate = await run(["design", "validate", "--context", contextDir]);
   assert.match(validate.stdout, /OK:/);
 
   const fragment = await run(["design", "issue-fragment", "--context", contextDir]);
   assert.match(fragment.stdout, /Manifest/);
-  assert.match(fragment.stdout, /issue-102-v1/);
+  assert.match(fragment.stdout, /Current Version: v1/);
+
+  const issueRoot = path.join(repo, ".pragma", "design-contexts", "issue-102");
+  const pinnedBeforePublish = JSON.parse((await run(["design", "read", "--context", issueRoot, "--version", "v1", "--summary-only"])).stdout);
+  assert.equal(pinnedBeforePublish.version, "v1");
+  await assert.rejects(
+    run(["design", "read", "--context", contextDir, "--version", "v2", "--summary-only"]),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /does not match context directory version/);
+      return true;
+    }
+  );
+
+  const publish = JSON.parse((await run(["design", "publish", "--context", contextDir, "--threshold-mb", "20"])).stdout);
+  assert.equal(publish.version, "v1");
+  assert.match(publish.currentPath, /current\.json$/);
+  const current = await readJson(path.join(repo, ".pragma", "design-contexts", "issue-102", "current.json"));
+  assert.equal(current.currentVersion, "v1");
+  assert.equal(current.currentManifest, "versions/v1/manifest.json");
+  const validateRoot = await run(["design", "validate", "--context", path.join(repo, ".pragma", "design-contexts", "issue-102")]);
+  assert.match(validateRoot.stdout, /OK:/);
 
   const read = await run(["design", "read", "--repo", repo, "--issue", "102", "--summary-only"]);
   const readResult = JSON.parse(read.stdout);
   assert.equal(readResult.ok, true);
+  assert.equal(readResult.version, "v1");
+  assert.match(readResult.checksum, /^sha256:/);
+  assert.match(readResult.manifestChecksum, /^sha256:/);
+  assert.match(readResult.packageChecksum, /^sha256:/);
   assert.match(readResult.agentContextPath, /agent-context\.md$/);
-  assert.match(readResult.pixelSpecPath, /pixel-spec\.json$/);
+  assert.match(readResult.agentWorkflowPath, /agent-workflow\.md$/);
+  assert.match(readResult.pixelSpecPath, /pixel-spec[\\/]index\.json$/);
+  assert.match(readResult.layersPath, /layers[\\/]index\.json$/);
+  const manifest = await readJson(path.join(contextDir, "manifest.json"));
+  assert.equal(manifest.version, "v1");
+  assert.equal(manifest.versionNumber, 1);
+  assert.equal(manifest.issue.type, "design");
+  assert.match(manifest.sourceChecksum, /^sha256:/);
+  assert.match(manifest.packageChecksum, /^sha256:/);
+  assert.equal(readResult.packageChecksum, manifest.packageChecksum);
+  assert.notEqual(readResult.manifestChecksum, readResult.packageChecksum);
+  assert.equal(manifest.entrypoints.agentWorkflow, "normalized/agent-workflow.md");
+  assert.equal(manifest.entrypoints.pixelSpec, "normalized/pixel-spec/index.json");
+  assert.equal(manifest.entrypoints.layers, "normalized/layers/index.json");
+  const currentFragment = await run(["design", "issue-fragment", "--repo", repo, "--issue", "102"]);
+  assert.match(currentFragment.stdout, /Current Pointer/);
+  assert.match(currentFragment.stdout, /versions\/v1\/manifest\.json/);
+  const agentWorkflow = await fs.readFile(path.join(contextDir, "normalized", "agent-workflow.md"), "utf8");
+  assert.match(agentWorkflow, /Progressive Disclosure Rules/);
+  assert.match(agentWorkflow, /Business Data Safety/);
+  const designContext = await readJson(path.join(contextDir, "normalized", "design-context.json"));
+  assert.equal(Array.isArray(designContext.pageRegions), true);
+  assert.equal(designContext.pageRegions.length > 0, true);
+  assert.equal(designContext.pixelSpec, "normalized/pixel-spec/index.json");
+  const pixelIndex = await readJson(path.join(contextDir, "normalized", "pixel-spec", "index.json"));
+  assert.equal(pixelIndex.kind, "pragma-pixel-spec-index");
+  assert.equal(pixelIndex.regions.length > 0, true);
+  const regionShards = await Promise.all(pixelIndex.regions.map((region) => readJson(path.join(contextDir, region.path))));
+  assert.equal(regionShards.every((shard) => shard.kind === "pragma-pixel-spec-region"), true);
+  const regionTitleNode = regionShards.flatMap((shard) => shard.nodes).find((node) => node.figmaNodeId === "1:24");
+  assert.equal(regionTitleNode.text.typography.resolvedValue.fontSize, 24);
+  assert.equal(regionTitleNode.text.typography.resolvedValue.fontStyle, "Semi Bold");
+  const layerIndex = await readJson(path.join(contextDir, "normalized", "layers", "index.json"));
+  assert.equal(layerIndex.kind, "pragma-layer-tree-index");
+  const layerShard = await readJson(path.join(contextDir, layerIndex.frames[0].path));
+  assert.equal(layerShard.kind, "pragma-layer-tree-frame");
+  assert.equal(layerShard.nodes.every((node) => !("bounds" in node) && !("componentRef" in node) && !("text" in node) && !("assetBinding" in node)), true);
   const pixelSpec = JSON.parse(await fs.readFile(path.join(contextDir, "normalized", "pixel-spec.json"), "utf8"));
   assert.equal(pixelSpec.kind, "pragma-pixel-spec");
   assert.equal(pixelSpec.nodes.some((node) => node.assetBinding?.assetId === "asset-drone-icon"), true);
@@ -129,12 +205,24 @@ test("ingest, validate, issue-fragment, read, and asset lookup work", async () =
   const mainNode = pixelSpec.nodes.find((node) => node.figmaNodeId === "1:23");
   assert.equal(mainNode.radius.tokenId, "radius-radius-sm");
   assert.deepEqual(mainNode.radius.resolvedValue, { topLeft: 4, topRight: 4, bottomRight: 4, bottomLeft: 4 });
-  assert.equal(mainNode.fills[0].color.tokenId, "color-text-primary");
+  assert.equal(mainNode.fills[0].color.tokenId, "color-surface-fill");
+  assert.equal(titleNode.text.typography.tokenId, "typography-heading-lg");
+  const buttonNode = pixelSpec.nodes.find((node) => node.figmaNodeId === "1:40");
+  assert.equal(buttonNode.availableStates.some((state) => state.source === "figma-variant-property" && state.value === "Pressed"), true);
+  const tokens = await readJson(path.join(contextDir, "normalized", "tokens.json"));
+  assert.equal(tokens.tokens.some((token) => token.source?.variableId === "VariableID:surface"), true);
+  assert.equal(tokens.tokens.some((token) => token.source?.styleId === "S:heading"), true);
+  const components = await readJson(path.join(contextDir, "normalized", "components.json"));
+  const buttonInstance = components.instances.find((instance) => instance.figmaNodeId === "1:40");
+  assert.equal(buttonInstance.variantProperties.State, "Pressed");
+  assert.equal(components.metadataCompleteness.visualStateSourceCount, 1);
   const layers = JSON.parse(await fs.readFile(path.join(contextDir, "normalized", "layers.json"), "utf8"));
   assert.equal(layers.nodes.every((node) => !("bounds" in node) && !("componentRef" in node) && !("text" in node) && !("assetBinding" in node)), true);
   const assets = JSON.parse(await fs.readFile(path.join(contextDir, "normalized", "assets.json"), "utf8"));
   assert.equal(assets.assets.every((assetItem) => !("bindings" in assetItem) && !("fit" in assetItem) && !("crop" in assetItem) && !("placement" in assetItem)), true);
   assert.deepEqual(assets.assets[0].usedByNodeIds, ["node-1-30"]);
+  const sourceSummary = await readJson(path.join(contextDir, "source", "capture-summary.json"));
+  assert.equal(sourceSummary.diagnostics.assetBindingCount, 1);
   const visualBaseline = JSON.parse(await fs.readFile(path.join(contextDir, "validation", "visual-baseline.json"), "utf8"));
   assert.equal(visualBaseline.kind, "pragma-visual-baseline");
 
@@ -153,14 +241,15 @@ test("validate enforces normalized canonical ownership and token mapping", async
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-canonical-"));
   const { input, repo } = await createInputFixture(tmp);
   await run(["design", "ingest", "--input", input, "--repo", repo]);
-  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102");
+  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102", "versions", "v1");
 
   const layersPath = path.join(contextDir, "normalized", "layers.json");
   const layers = await readJson(layersPath);
   layers.nodes[0].bounds = { x: 0, y: 0, width: 1, height: 1 };
   await writeJson(layersPath, layers);
 
-  const pixelPath = path.join(contextDir, "normalized", "pixel-spec.json");
+  const pixelIndex = await readJson(path.join(contextDir, "normalized", "pixel-spec", "index.json"));
+  const pixelPath = path.join(contextDir, pixelIndex.frames[0].path);
   const pixelSpec = await readJson(pixelPath);
   pixelSpec.nodes.find((node) => node.figmaNodeId === "1:24").text.color = { tokenId: "color-text-primary" };
   await writeJson(pixelPath, pixelSpec);
@@ -188,6 +277,50 @@ test("validate enforces normalized canonical ownership and token mapping", async
   );
 });
 
+
+test("validate enforces agent workflow sections, legacy shard consistency, and runtime-state boundaries", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-workflow-"));
+  const { input, repo } = await createInputFixture(tmp);
+  await run(["design", "ingest", "--input", input, "--repo", repo]);
+  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102", "versions", "v1");
+
+  await fs.writeFile(path.join(contextDir, "normalized", "agent-workflow.md"), "# Agent Workflow\n\n## Read Gate\nOnly.\n", "utf8");
+  await assert.rejects(
+    run(["design", "validate", "--context", contextDir, "--json"]),
+    (error) => {
+      assert.equal(error.code, 1);
+      const result = JSON.parse(error.stdout);
+      assert.equal(result.errors.some((item) => item.includes("agent-workflow.md must include typography")), true);
+      return true;
+    }
+  );
+
+  await run(["design", "ingest", "--input", input, "--repo", repo, "--force"]);
+  const pixelIndexPath = path.join(contextDir, "normalized", "pixel-spec", "index.json");
+  const pixelIndex = await readJson(pixelIndexPath);
+  pixelIndex.availableStates = [{ name: "forced selected", source: "issue-runtime-default", nodeIds: ["node-1-23"] }];
+  await writeJson(pixelIndexPath, pixelIndex);
+  const legacyPixelPath = path.join(contextDir, "normalized", "pixel-spec.json");
+  const legacyPixel = await readJson(legacyPixelPath);
+  legacyPixel.nodes.pop();
+  await writeJson(legacyPixelPath, legacyPixel);
+  const legacyLayersPath = path.join(contextDir, "normalized", "layers.json");
+  const legacyLayers = await readJson(legacyLayersPath);
+  legacyLayers.nodes.pop();
+  await writeJson(legacyLayersPath, legacyLayers);
+
+  await assert.rejects(
+    run(["design", "validate", "--context", contextDir, "--json"]),
+    (error) => {
+      assert.equal(error.code, 1);
+      const result = JSON.parse(error.stdout);
+      assert.equal(result.issues.some((issue) => issue.code === "LEGACY_AGGREGATE_MISMATCH"), true);
+      assert.equal(result.issues.some((issue) => issue.code === "ISSUE_RUNTIME_DEFAULT_STATE"), true);
+      return true;
+    }
+  );
+});
+
 test("ingest prunes frame render assets and validate rejects them under assets", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-frame-render-"));
   const { input, repo } = await createInputFixture(tmp);
@@ -204,7 +337,7 @@ test("ingest prunes frame render assets and validate rejects them under assets",
   await writeJson(path.join(input, "assets-manifest.json"), manifest);
 
   await run(["design", "ingest", "--input", input, "--repo", repo]);
-  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102");
+  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102", "versions", "v1");
   await assert.rejects(fs.access(path.join(contextDir, "assets", "images", "homepage-render.png")));
   const assets = await readJson(path.join(contextDir, "normalized", "assets.json"));
   assert.equal(assets.assets.some((asset) => asset.id === "asset-homepage-render"), false);
@@ -368,9 +501,14 @@ test("preflight blocks selected snapshot repair when selected frame data is abse
 test("source snapshots are content-addressed and reused for identical content", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-source-"));
   const { input, repo } = await createInputFixture(tmp);
-  const first = JSON.parse((await run(["design", "source", "add", "--role", "components", "--input", input, "--repo", repo, "--file-key", "file-key", "--frame-node-id", "5:100"])).stdout);
+  const selection = await readJson(path.join(input, "figma", "selection.json"));
+  selection.frames.components = [{ role: "components", nodeId: "5:100", name: "Components", type: "FRAME", bounds: { x: 0, y: 1000, width: 360, height: 240 } }];
+  selection.frames.assets = [{ role: "assets", nodeId: "6:200", name: "Assets", type: "FRAME", bounds: { x: 400, y: 1000, width: 360, height: 240 } }];
+  await writeJson(path.join(input, "figma", "selection.json"), selection);
+  const first = JSON.parse((await run(["design", "source", "add", "--role", "components", "--input", input, "--repo", repo, "--file-key", "file-key"])).stdout);
   assert.equal(first.created, true);
   assert.equal(first.reused, false);
+  assert.equal(first.frameNodeId, "5:100");
 
   const second = JSON.parse((await run(["design", "source", "add", "--role", "components", "--input", input, "--repo", repo, "--file-key", "file-key", "--frame-node-id", "5:100"])).stdout);
   assert.equal(second.snapshotId, first.snapshotId);
@@ -447,17 +585,17 @@ test("validate --source-registry checks registry health and catches broken lates
   );
 });
 
-test("read blocks design/context development issue when dependent context is missing", async () => {
+test("read blocks when required Design Issue context is missing", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-block-"));
   const repo = path.join(tmp, "repo");
   await fs.mkdir(path.join(repo, "issues"), { recursive: true });
   const devIssue = path.join(repo, "issues", "issue-101.md");
-  await fs.writeFile(devIssue, "设计分类：design/context\n\n设计依赖：\n- Depends on #102\n", "utf8");
+  await fs.writeFile(devIssue, "## 设计输入\n\n需要 Design Issue：是\nDesign Issue：#102\n", "utf8");
   await assert.rejects(
     run(["design", "read", "--repo", repo, "--dev-issue-file", devIssue]),
     (error) => {
       assert.equal(error.code, 2);
-      assert.match(error.stderr, /尚未交付 Pragma Context/);
+      assert.match(error.stderr, /尚未提供可读取的 current pointer/);
       return true;
     }
   );
@@ -467,7 +605,7 @@ test("pack writes zip outside context and publish keeps repo mode zip-free", asy
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-pack-"));
   const { input, repo } = await createInputFixture(tmp);
   await run(["design", "ingest", "--input", input, "--repo", repo]);
-  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102");
+  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102", "versions", "v1");
   const pack = await run(["design", "pack", "--context", contextDir]);
   const packResult = JSON.parse(pack.stdout);
   assert.equal(packResult.ok, true);
@@ -496,7 +634,7 @@ test("publish supports Gitea Generic Package Registry dry run", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-publish-"));
   const { input, repo } = await createInputFixture(tmp);
   await run(["design", "ingest", "--input", input, "--repo", repo]);
-  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102");
+  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102", "versions", "v1");
   const publish = await run([
     "design",
     "publish",
@@ -515,6 +653,7 @@ test("publish supports Gitea Generic Package Registry dry run", async () => {
   assert.equal(publishResult.artifact.packageVersion, "issue-102-v1");
   assert.match(publishResult.artifact.downloadUrl, /api\/packages\/example-org\/generic\/pragma-design-context\/issue-102-v1\/context\.zip/);
   assert.match(publishResult.artifact.checksum, /^sha256:/);
+  await assert.rejects(fs.access(path.join(repo, ".pragma", "design-contexts", "issue-102", "current.json")));
 
   const validate = await run(["design", "validate", "--context", contextDir]);
   assert.match(validate.stdout, /OK:/);
@@ -530,6 +669,36 @@ test("publish supports Gitea Generic Package Registry dry run", async () => {
   );
 });
 
+test("publish rejects version and Design Issue mismatches without advancing current", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-publish-identity-"));
+  const { input, repo } = await createInputFixture(tmp);
+  await run(["design", "ingest", "--input", input, "--repo", repo]);
+  const issueRoot = path.join(repo, ".pragma", "design-contexts", "issue-102");
+  const contextDir = path.join(issueRoot, "versions", "v1");
+
+  await assert.rejects(
+    run(["design", "publish", "--context", contextDir, "--version", "v2"]),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /does not match context directory version/);
+      return true;
+    }
+  );
+  await assert.rejects(
+    run(["design", "publish", "--context", contextDir, "--issue", "103"]),
+    (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /does not match manifest\.issue\.number/);
+      return true;
+    }
+  );
+
+  const manifest = await readJson(path.join(contextDir, "manifest.json"));
+  assert.equal(manifest.version, "v1");
+  assert.equal(manifest.issue.number, 102);
+  await assert.rejects(fs.access(path.join(issueRoot, "current.json")));
+});
+
 test("pack-from-figma-capture runs the full deterministic pipeline", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-combo-"));
   const { input, repo } = await createInputFixture(tmp);
@@ -538,6 +707,8 @@ test("pack-from-figma-capture runs the full deterministic pipeline", async () =>
   assert.equal(packedResult.ok, true);
   assert.equal(packedResult.preflight.ok, true);
   assert.equal(packedResult.readSmokeCheck.ok, true);
+  assert.match(packedResult.readSmokeCheck.agentWorkflowPath, /agent-workflow\.md$/);
+  assert.match(packedResult.readSmokeCheck.layersPath, /layers[\\/]index\.json$/);
   for (const key of ["resolveInputMs", "preflightMs", "ingestMs", "packZipMs", "publishMs", "issueFragmentMs", "validateMs", "readSmokeCheckMs"]) {
     assert.equal(typeof packedResult.timings[key], "number");
   }
@@ -550,6 +721,9 @@ test("pack-from-figma-capture runs the full deterministic pipeline", async () =>
   assert.equal(summary.kind, "pragma-pipeline-summary");
   assert.equal(summary.preflightSummary.unresolved, 0);
   assert.equal(summary.readSmokeCheck.ok, true);
+  await fs.access(path.join(packedResult.contextDir, "normalized", "pixel-spec", "index.json"));
+  await fs.access(path.join(packedResult.contextDir, "normalized", "layers", "index.json"));
+  await fs.access(path.join(packedResult.contextDir, "normalized", "agent-workflow.md"));
   await fs.access(path.join(packedResult.contextDir, "normalized", "pixel-spec.json"));
   await fs.access(path.join(packedResult.contextDir, "validation", "visual-baseline.json"));
   await assert.rejects(fs.access(path.join(packedResult.contextDir, "context.zip")));
@@ -557,13 +731,13 @@ test("pack-from-figma-capture runs the full deterministic pipeline", async () =>
 
 test("pack-latest-capture resolves latest repo-scoped capture and supports explicit input", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-latest-"));
-  const fixtureRoot = path.join(tmp, "中文路径");
+  const fixtureRoot = path.join(tmp, "涓枃璺緞");
   const { input, repo } = await createInputFixture(fixtureRoot);
   const older = await copyIncomingCapture(input, repo, 102, "20260707T010000");
   const latest = await copyIncomingCapture(input, repo, 102, "20260707T020000");
   const latestLayersPath = path.join(latest, "figma", "layers.json");
   const latestLayers = await readJson(latestLayersPath);
-  latestLayers.nodes[0].name = "主页";
+  latestLayers.nodes[0].name = "涓婚〉";
   await writeJson(latestLayersPath, latestLayers);
 
   const outsideRepo = path.join(tmp, "outside-repo");
@@ -575,7 +749,7 @@ test("pack-latest-capture resolves latest repo-scoped capture and supports expli
   assert.equal(path.resolve(resolved.inputPath), path.resolve(latest));
   assert.equal(resolved.latestCapture.selectedCaptureName, "issue-102-20260707T020000");
   assert.equal(resolved.inputPath.includes("outside-repo"), false);
-  await assert.rejects(fs.access(path.join(repo, ".pragma", "design-contexts", "issue-102")));
+  await assert.rejects(fs.access(path.join(repo, ".pragma", "design-contexts", "issue-102", "versions", "v1")));
 
   const explicit = JSON.parse((await run(["design", "pack-latest-capture", "--repo", repo, "--issue", "102", "--input", older, "--preflight-only", "--json"])).stdout);
   assert.equal(explicit.ok, true);
@@ -608,7 +782,7 @@ test("pack-latest-capture protects existing context and force reruns", async () 
       assert.equal(error.code, 2);
       const result = JSON.parse(error.stderr);
       assert.equal(result.code, "PRAGMA_CONTEXT_EXISTS");
-      assert.match(result.message, /Context already exists/);
+      assert.match(result.message, /Context version already exists/);
       return true;
     }
   );
@@ -617,6 +791,94 @@ test("pack-latest-capture protects existing context and force reruns", async () 
   assert.equal(forced.ok, true);
   assert.equal(forced.contextDir, first.contextDir);
   assert.equal(forced.readSmokeCheck.ok, true);
+});
+
+test("version bump creates immutable v2, read can pin versions, and diff summarizes changes", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-version-"));
+  const { input, repo } = await createInputFixture(tmp);
+  const first = JSON.parse((await run(["design", "pack-from-figma-capture", "--input", input, "--repo", repo, "--threshold-mb", "20"])).stdout);
+  assert.match(first.contextDir, /versions[\\/]v1$/);
+
+  const second = JSON.parse((await run(["design", "pack-from-figma-capture", "--input", input, "--repo", repo, "--bump", "auto", "--supersedes", "v1", "--threshold-mb", "20"])).stdout);
+  assert.match(second.contextDir, /versions[\\/]v2$/);
+  const current = await readJson(path.join(repo, ".pragma", "design-contexts", "issue-102", "current.json"));
+  assert.equal(current.currentVersion, "v2");
+
+  const readPinned = JSON.parse((await run(["design", "read", "--repo", repo, "--issue", "102", "--version", "v1", "--summary-only"])).stdout);
+  assert.equal(readPinned.version, "v1");
+  assert.match(readPinned.manifestPath, /versions[\\/]v1[\\/]manifest\.json$/);
+
+  const diff = JSON.parse((await run(["design", "diff", "--repo", repo, "--issue", "102", "--from", "v1", "--to", "v2", "--json"])).stdout);
+  assert.equal(diff.ok, true);
+  assert.equal(diff.from.version, "v1");
+  assert.equal(diff.to.version, "v2");
+  assert.equal(diff.changed, true);
+  assert.equal(diff.summary.manifestChanged, true);
+  assert.equal(diff.summary.compatibility.reason, "new design context version");
+});
+
+test("component normalization preserves main component and component-set identities", () => {
+  const normalized = buildComponents({
+    componentSets: [{
+      id: "4:5",
+      name: "Button set",
+      type: "COMPONENT_SET",
+      components: [{ id: "5:6", name: "State=Default", type: "COMPONENT", componentSetId: "4:5" }]
+    }],
+    components: [{ id: "5:6", name: "State=Default", type: "COMPONENT", componentSetId: "4:5" }]
+  }, [{
+    id: "7:8",
+    name: "Button instance",
+    type: "INSTANCE",
+    componentRef: {
+      componentId: "5:6",
+      mainComponentNodeId: "5:6",
+      componentSetId: "4:5",
+      componentSetName: "Button set"
+    }
+  }], new Map([["7:8", "node-7-8"]]));
+
+  assert.deepEqual(normalized.componentSets.map((component) => component.id), ["4:5"]);
+  assert.deepEqual(normalized.components.map((component) => component.id), ["5:6"]);
+  assert.equal(normalized.instances[0].componentId, "5:6");
+  assert.equal(normalized.instances[0].componentSetId, "4:5");
+});
+
+test("ingest keeps component and asset capture roots out of page frame shards", async () => {
+  const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-role-roots-"));
+  const { input, repo } = await createInputFixture(tmp);
+  const selection = await readJson(path.join(input, "figma", "selection.json"));
+  selection.frames.components = [{ role: "components", nodeId: "5:100", name: "Components", type: "FRAME" }];
+  selection.frames.assets = [{ role: "assets", nodeId: "6:200", name: "Assets", type: "FRAME" }];
+  await writeJson(path.join(input, "figma", "selection.json"), selection);
+
+  const layers = await readJson(path.join(input, "figma", "layers.json"));
+  layers.rootNodeIds.push("5:100", "6:200");
+  layers.nodes.push(
+    { figmaNodeId: "5:100", name: "Components", type: "FRAME", role: "components", bounds: { x: 0, y: 1000, width: 400, height: 300 }, children: ["5:101"] },
+    { figmaNodeId: "5:101", name: "State=Default", type: "COMPONENT", role: "components", bounds: { x: 0, y: 1000, width: 120, height: 40 }, children: [] },
+    { figmaNodeId: "6:200", name: "Assets", type: "FRAME", role: "assets", bounds: { x: 500, y: 1000, width: 400, height: 300 }, children: [] }
+  );
+  await writeJson(path.join(input, "figma", "layers.json"), layers);
+  await writeJson(path.join(input, "figma", "components.json"), {
+    componentSets: [],
+    components: [{ id: "5:101", nodeId: "5:101", name: "State=Default", type: "COMPONENT" }],
+    instances: []
+  });
+
+  await run(["design", "ingest", "--input", input, "--repo", repo]);
+  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102", "versions", "v1");
+  const designContext = await readJson(path.join(contextDir, "normalized", "design-context.json"));
+  const pixelSpec = await readJson(path.join(contextDir, "normalized", "pixel-spec.json"));
+  const layerTree = await readJson(path.join(contextDir, "normalized", "layers.json"));
+  const components = await readJson(path.join(contextDir, "normalized", "components.json"));
+
+  assert.deepEqual(designContext.frames.map((frame) => frame.figmaNodeId), ["1:23"]);
+  assert.equal(pixelSpec.nodes.some((node) => node.figmaNodeId === "5:100" || node.figmaNodeId === "6:200"), false);
+  assert.equal(layerTree.nodes.some((node) => node.figmaNodeId === "5:100" || node.figmaNodeId === "6:200"), false);
+  assert.equal(components.components.some((component) => component.id === "5:101"), true);
+  const validate = await run(["design", "validate", "--context", contextDir]);
+  assert.match(validate.stdout, /OK:/);
 });
 
 test("from-figma returns timings and updates pipeline summary", async () => {
@@ -690,12 +952,26 @@ test("pack-from-figma-capture creates a default dependency lock for legacy captu
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-legacy-lock-"));
   const { input, repo } = await createInputFixture(tmp);
   await fs.rm(path.join(input, "dependency-lock.json"), { force: true });
+  const capture = await readJson(path.join(input, "capture.json"));
+  capture.figma.nodeIds = [];
+  await writeJson(path.join(input, "capture.json"), capture);
+  const selection = await readJson(path.join(input, "figma", "selection.json"));
+  selection.nodes = [];
+  selection.frames = {
+    page: [{ role: "page", nodeId: "1:23", name: "Plugin page", type: "FRAME", bounds: { x: 0, y: 0, width: 1440, height: 900 }, viewport: { width: 1440, height: 900 }, url: "https://www.figma.com/design/file-key/Demo?node-id=1-23" }],
+    components: [{ role: "components", nodeId: "5:100", name: "Components" }],
+    assets: [{ role: "assets", nodeId: "6:200", name: "Assets" }]
+  };
+  await writeJson(path.join(input, "figma", "selection.json"), selection);
   const packedResult = JSON.parse((await run(["design", "pack-from-figma-capture", "--input", input, "--repo", repo, "--threshold-mb", "20"])).stdout);
   assert.equal(packedResult.ok, true);
   assert.equal(packedResult.preflight.repairs.some((repair) => repair.code === "DEPENDENCY_LOCK_CREATED"), true);
   const deps = await readJson(path.join(packedResult.contextDir, "normalized", "dependencies.json"));
   assert.equal(deps.components.status, "none");
   assert.equal(deps.pageFrames[0].snapshotId, "page-1-23-capture");
+  assert.equal(deps.pageFrames[0].name, "Plugin page");
+  assert.equal(deps.pageFrames[0].viewport.width, 1440);
+  assert.equal(deps.pageFrames.some((frame) => frame.nodeId === "5:100" || frame.nodeId === "6:200"), false);
 });
 
 test("validate --context checks locked dependency snapshots are recoverable from repo registry", async () => {
@@ -746,8 +1022,9 @@ test("validate rejects broken pixel spec asset references", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-invalid-"));
   const { input, repo } = await createInputFixture(tmp);
   await run(["design", "ingest", "--input", input, "--repo", repo]);
-  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102");
-  const pixelSpecPath = path.join(contextDir, "normalized", "pixel-spec.json");
+  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102", "versions", "v1");
+  const pixelIndex = await readJson(path.join(contextDir, "normalized", "pixel-spec", "index.json"));
+  const pixelSpecPath = path.join(contextDir, pixelIndex.frames[0].path);
   const pixelSpec = JSON.parse(await fs.readFile(pixelSpecPath, "utf8"));
   pixelSpec.nodes.find((node) => node.assetBinding?.assetId === "asset-drone-icon").assetBinding.assetId = "asset-missing";
   await fs.writeFile(pixelSpecPath, `${JSON.stringify(pixelSpec, null, 2)}\n`, "utf8");
@@ -765,7 +1042,7 @@ test("validate rejects floating latest dependency locks", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-floating-"));
   const { input, repo } = await createInputFixture(tmp);
   await run(["design", "ingest", "--input", input, "--repo", repo]);
-  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102");
+  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102", "versions", "v1");
   const depsPath = path.join(contextDir, "normalized", "dependencies.json");
   const deps = await readJson(depsPath);
   deps.components = {
@@ -790,7 +1067,7 @@ test("validate rejects bad asset checksum or MIME facts", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-bad-asset-"));
   const { input, repo } = await createInputFixture(tmp);
   await run(["design", "ingest", "--input", input, "--repo", repo]);
-  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102");
+  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102", "versions", "v1");
   await fs.writeFile(path.join(contextDir, "assets", "icons", "drone.svg"), "not an svg\n", "utf8");
   await assert.rejects(
     run(["design", "validate", "--context", contextDir]),
@@ -806,7 +1083,7 @@ test("enrich writes an explicit non-fact enrichment file", async () => {
   const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "pragma2-enrich-"));
   const { input, repo } = await createInputFixture(tmp);
   await run(["design", "ingest", "--input", input, "--repo", repo]);
-  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102");
+  const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102", "versions", "v1");
   const enriched = await run(["design", "enrich", "--context", contextDir, "--notes", "Use product tabs where available.", "--generated-by", "test", "--model", "none"]);
   const enrichedResult = JSON.parse(enriched.stdout);
   const text = await fs.readFile(enrichedResult.output, "utf8");

@@ -11,7 +11,9 @@
       "path": "assets/icons/drone.svg",
       "width": 32,
       "height": 32,
-      "sourceNodeIds": [],
+      "sourceNodeIds": [
+        "node-1-40"
+      ],
       "usedByNodeIds": [
         "node-1-40"
       ],
@@ -27,7 +29,9 @@
       "path": "assets/images/panel-bg.png",
       "width": 1,
       "height": 1,
-      "sourceNodeIds": [],
+      "sourceNodeIds": [
+        "node-1-50"
+      ],
       "usedByNodeIds": [
         "node-1-50"
       ],

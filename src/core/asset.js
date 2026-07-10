@@ -3,9 +3,11 @@ import path from "node:path";
 import { CliError } from "./errors.js";
 import { ensureDir, pathExists, readJson } from "./fs.js";
 import { assertValidDesignContext } from "./validate.js";
+import { resolveVersionContext } from "./versioning.js";
 
 export async function resolveDesignAsset(options) {
-  const contextDir = path.resolve(String(options.context));
+  const resolved = await resolveVersionContext(options);
+  const contextDir = resolved.contextDir;
   const id = String(options.id || "");
   if (!id) throw new CliError("--id is required for design asset lookup.");
   await assertValidDesignContext({ context: contextDir });

@@ -8,6 +8,7 @@ import { normalizeFigmaNodeId, parseFigmaUrl } from "./figma-url.js";
 import { mimeForType, sniffAssetFile, typeFromExtension } from "./mime.js";
 import { isFrameRenderAsset } from "./normalize.js";
 import { utf8Diagnostics } from "./text-encoding.js";
+import { isVersionDir, normalizeVersion, readCurrentPointer, resolveVersionContext } from "./versioning.js";
 
 function assert(condition, message, errors) {
   if (!condition) errors.push(message);
@@ -151,6 +152,237 @@ async function readEntrypointJson(contextDir, entrypoints, key, errors) {
     errors.push(`${rel} is not valid JSON: ${error.message}`);
     return undefined;
   }
+}
+
+
+function routePath(route) {
+  return typeof route === "string" ? route : route?.path;
+}
+
+function routeId(route) {
+  return typeof route === "string" ? route : route?.id;
+}
+
+function resolveContextRelative(contextDir, relPath) {
+  if (!relPath || path.isAbsolute(String(relPath))) return undefined;
+  const resolved = path.resolve(contextDir, String(relPath).replace(/\\/g, "/"));
+  return isPathInside(contextDir, resolved) ? resolved : undefined;
+}
+
+async function readContextJson(contextDir, relPath, errors, issues, code, message, details = {}) {
+  const file = resolveContextRelative(contextDir, relPath);
+  if (!file) {
+    validationIssue(errors, issues, code, `${message}: invalid package path ${relPath}`, { ...details, path: relPath });
+    return undefined;
+  }
+  if (!(await pathExists(file))) {
+    validationIssue(errors, issues, code, `${message}: ${relPath}`, { ...details, path: relPath });
+    return undefined;
+  }
+  try {
+    return await readJson(file);
+  } catch (error) {
+    validationIssue(errors, issues, code, `${message}: ${error.message}`, { ...details, path: relPath });
+    return undefined;
+  }
+}
+
+function addUniqueNode(nodes, nodeIds, figmaNodeIds, node) {
+  if (!node?.id || nodeIds.has(node.id)) return;
+  nodes.push(node);
+  nodeIds.add(node.id);
+  if (node.figmaNodeId) figmaNodeIds.add(node.figmaNodeId);
+}
+
+function validatePixelNodeFacts(node, errors, issues, sourcePath) {
+  assert(Boolean(node.id), "pixel-spec node.id is required", errors);
+  assert(Boolean(node.figmaNodeId), `pixel-spec node ${node.id || "<unknown>"} figmaNodeId is required`, errors);
+  assert(Boolean(node.layerRef), `pixel-spec node ${node.id || "<unknown>"} layerRef is required`, errors);
+  assert(Boolean(node.name), `pixel-spec node ${node.id || "<unknown>"} name is required`, errors);
+  assert(Boolean(node.type), `pixel-spec node ${node.id || "<unknown>"} type is required`, errors);
+  assert(node.bounds && Number.isFinite(Number(node.bounds.width)) && Number.isFinite(Number(node.bounds.height)), `pixel-spec node ${node.id || "<unknown>"} bounds are required`, errors);
+  if (Array.isArray(node.children) && node.children.length > 0) {
+    validationIssue(errors, issues, "NORMALIZED_CANONICAL_OWNERSHIP", `pixel-spec node ${node.id || "<unknown>"} must not duplicate layer tree children`, { path: sourcePath, nodeId: node.id, field: "children" });
+  }
+}
+
+function collectStateEntries(value) {
+  return [...asArray(value?.states), ...asArray(value?.availableStates)];
+}
+
+function validateAvailableStateEntries(scope, states, pixelNodeIds, errors, issues) {
+  for (const state of asArray(states)) {
+    const stateText = [state?.name, state?.id, state?.source, state?.kind, state?.reason].filter(Boolean).join(" ").toLowerCase();
+    if (state?.isRuntimeDefault === true || state?.runtimeDefault === true || /issue[-_\s]?runtime[-_\s]?default|business[-_\s]?runtime[-_\s]?default|runtime[-_\s]?default/.test(stateText)) {
+      validationIssue(errors, issues, "ISSUE_RUNTIME_DEFAULT_STATE", `${scope} availableStates must not encode Issue runtime default state`, { scope, state: state?.name || state?.id });
+    }
+    for (const nodeId of asArray(state?.nodeIds)) {
+      assert(pixelNodeIds.has(nodeId), `${scope} state ${state?.name || "<unknown>"} references unknown pixel node ${nodeId}`, errors);
+    }
+  }
+}
+
+function compareLegacyNodeSet({ legacy, actualIds, label, path: legacyPath, errors, issues }) {
+  if (!legacy || !Array.isArray(legacy.nodes)) return;
+  const legacyIds = new Set(legacy.nodes.map((node) => node.id).filter(Boolean));
+  const missing = [...legacyIds].filter((id) => !actualIds.has(id));
+  const extra = [...actualIds].filter((id) => !legacyIds.has(id));
+  if (missing.length || extra.length) {
+    validationIssue(errors, issues, "LEGACY_AGGREGATE_MISMATCH", `${legacyPath} must match ${label} shard node ids`, { path: legacyPath, missing, extra });
+  }
+}
+
+async function readLegacyAggregate(contextDir, relPath) {
+  const file = resolveContextRelative(contextDir, relPath);
+  if (!file || !(await pathExists(file))) return undefined;
+  return readJson(file).catch(() => undefined);
+}
+
+async function buildPixelValidationModel({ contextDir, pixelSpec, errors, warnings, issues }) {
+  const nodes = [];
+  const nodeIds = new Set();
+  const figmaNodeIds = new Set();
+  const dynamicRegions = [];
+  const dynamicRegionIds = new Set();
+  const stateEntries = [];
+  let viewport = pixelSpec?.viewport;
+  let isSharded = false;
+
+  function mergePixelDoc(doc, sourcePath) {
+    if (!viewport && doc?.viewport) viewport = doc.viewport;
+    for (const node of asArray(doc?.nodes)) {
+      validatePixelNodeFacts(node, errors, issues, sourcePath);
+      addUniqueNode(nodes, nodeIds, figmaNodeIds, node);
+      for (const state of asArray(node.availableStates)) {
+        stateEntries.push({ ...state, nodeIds: [node.id].filter(Boolean) });
+      }
+    }
+    for (const region of asArray(doc?.dynamicRegions)) {
+      if (region?.id && !dynamicRegionIds.has(region.id)) {
+        dynamicRegions.push(region);
+        dynamicRegionIds.add(region.id);
+      }
+    }
+    stateEntries.push(...collectStateEntries(doc));
+  }
+
+  if (pixelSpec) {
+    assert(pixelSpec.schemaVersion === "2.0", "pixel-spec.schemaVersion must be 2.0", errors);
+    if (pixelSpec.kind === "pragma-pixel-spec-index") {
+      isSharded = true;
+      assert(Number.isFinite(Number(pixelSpec.viewport?.width)) && Number(pixelSpec.viewport.width) >= 0, "pixel-spec.viewport.width must be numeric", errors);
+      assert(Number.isFinite(Number(pixelSpec.viewport?.height)) && Number(pixelSpec.viewport.height) >= 0, "pixel-spec.viewport.height must be numeric", errors);
+      assert(Array.isArray(pixelSpec.frames), "pixel-spec index frames must be an array", errors);
+      assert(Array.isArray(pixelSpec.regions), "pixel-spec index regions must be an array", errors);
+      for (const region of asArray(pixelSpec.dynamicRegions)) {
+        if (region?.id && !dynamicRegionIds.has(region.id)) {
+          dynamicRegions.push(region);
+          dynamicRegionIds.add(region.id);
+        }
+      }
+      stateEntries.push(...collectStateEntries(pixelSpec));
+      for (const route of [...asArray(pixelSpec.frames), ...asArray(pixelSpec.regions)]) {
+        const rel = routePath(route);
+        const shard = await readContextJson(contextDir, rel, errors, issues, "PIXEL_SPEC_SHARD_MISSING", "pixel-spec shard is missing or invalid", { id: routeId(route) });
+        if (!shard) continue;
+        assert(["pragma-pixel-spec-frame", "pragma-pixel-spec-region"].includes(shard.kind), `${rel} kind must be pragma-pixel-spec-frame or pragma-pixel-spec-region`, errors);
+        assert(Array.isArray(shard.nodes), `${rel} nodes must be an array`, errors);
+        mergePixelDoc(shard, rel);
+      }
+      const legacy = await readLegacyAggregate(contextDir, "normalized/pixel-spec.json");
+      compareLegacyNodeSet({ legacy, actualIds: nodeIds, label: "pixel-spec", path: "normalized/pixel-spec.json", errors, issues });
+    } else {
+      assert(pixelSpec.kind === "pragma-pixel-spec", "pixel-spec.kind must be pragma-pixel-spec or pragma-pixel-spec-index", errors);
+      assert(Number.isFinite(Number(pixelSpec.viewport?.width)) && Number(pixelSpec.viewport.width) >= 0, "pixel-spec.viewport.width must be numeric", errors);
+      assert(Number.isFinite(Number(pixelSpec.viewport?.height)) && Number(pixelSpec.viewport.height) >= 0, "pixel-spec.viewport.height must be numeric", errors);
+      assert(Array.isArray(pixelSpec.nodes), "pixel-spec.nodes must be an array", errors);
+      mergePixelDoc(pixelSpec, "normalized/pixel-spec.json");
+    }
+  }
+
+  validateAvailableStateEntries("pixel-spec", stateEntries, nodeIds, errors, issues);
+  return {
+    isSharded,
+    aggregate: pixelSpec ? { schemaVersion: "2.0", kind: "pragma-pixel-spec", viewport, nodes, dynamicRegions, states: stateEntries } : undefined,
+    nodeIds,
+    figmaNodeIds,
+    dynamicRegionIds
+  };
+}
+
+function validateLayerNodeFacts(node, errors, issues, sourcePath) {
+  assert(Boolean(node.id), "layer node id is required", errors);
+  assert(Boolean(node.figmaNodeId), "layer node figmaNodeId is required", errors);
+  for (const field of LAYER_INLINE_FORBIDDEN_FIELDS) {
+    if (hasOwn(node, field)) {
+      validationIssue(errors, issues, "NORMALIZED_CANONICAL_OWNERSHIP", `layers node ${node.id || node.figmaNodeId || "<unknown>"} must not inline ${field}`, { path: sourcePath, nodeId: node.id || node.figmaNodeId, field });
+    }
+  }
+}
+
+function mergeLayerDoc(doc, sourcePath, nodes, layerIds, figmaNodeIds, errors, issues) {
+  for (const node of asArray(doc?.nodes)) {
+    validateLayerNodeFacts(node, errors, issues, sourcePath);
+    if (node?.id && !layerIds.has(node.id)) {
+      nodes.push(node);
+      layerIds.add(node.id);
+      if (node.figmaNodeId) figmaNodeIds.add(node.figmaNodeId);
+    }
+  }
+}
+
+async function buildLayerValidationModel({ contextDir, layers, errors, warnings, issues }) {
+  const nodes = [];
+  const layerIds = new Set();
+  const figmaNodeIds = new Set();
+  let rootNodeIds = [];
+  let isSharded = false;
+
+  if (layers) {
+    assert(layers.schemaVersion === "2.0", "layers.schemaVersion must be 2.0", errors);
+    if (layers.kind === "pragma-layer-tree-index") {
+      isSharded = true;
+      assert(Array.isArray(layers.rootNodeIds), "layers.rootNodeIds must be an array", errors);
+      assert(Array.isArray(layers.frames), "layers index frames must be an array", errors);
+      rootNodeIds = asArray(layers.rootNodeIds);
+      for (const route of asArray(layers.frames)) {
+        const rel = routePath(route);
+        const shard = await readContextJson(contextDir, rel, errors, issues, "LAYER_TREE_SHARD_MISSING", "layer tree shard is missing or invalid", { id: routeId(route) });
+        if (!shard) continue;
+        assert(shard.kind === "pragma-layer-tree-frame", `${rel} kind must be pragma-layer-tree-frame`, errors);
+        assert(Array.isArray(shard.rootNodeIds), `${rel} rootNodeIds must be an array`, errors);
+        assert(Array.isArray(shard.nodes), `${rel} nodes must be an array`, errors);
+        mergeLayerDoc(shard, rel, nodes, layerIds, figmaNodeIds, errors, issues);
+      }
+      const legacy = await readLegacyAggregate(contextDir, "normalized/layers.json");
+      if (legacy) {
+        mergeLayerDoc(legacy, "normalized/layers.json", [], new Set(), new Set(), errors, issues);
+        compareLegacyNodeSet({ legacy, actualIds: layerIds, label: "layers", path: "normalized/layers.json", errors, issues });
+      }
+    } else {
+      assert(layers.kind === "pragma-layer-tree", "layers.kind must be pragma-layer-tree or pragma-layer-tree-index", errors);
+      assert(Array.isArray(layers.rootNodeIds), "layers.rootNodeIds must be an array", errors);
+      assert(Array.isArray(layers.nodes), "layers.nodes must be an array", errors);
+      rootNodeIds = asArray(layers.rootNodeIds);
+      mergeLayerDoc(layers, "normalized/layers.json", nodes, layerIds, figmaNodeIds, errors, issues);
+    }
+
+    for (const rootNodeId of rootNodeIds) {
+      assert(layerIds.has(rootNodeId) || figmaNodeIds.has(rootNodeId), `layers.rootNodeIds references unknown node ${rootNodeId}`, errors);
+    }
+    for (const node of nodes) {
+      for (const child of asArray(node.children)) {
+        assert(layerIds.has(child) || figmaNodeIds.has(child), `layer ${node.id || node.figmaNodeId || "<unknown>"} references unknown child ${child}`, errors);
+      }
+    }
+  }
+
+  return {
+    isSharded,
+    aggregate: layers ? { schemaVersion: "2.0", kind: "pragma-layer-tree", rootNodeIds, nodes } : undefined,
+    layerIds,
+    figmaNodeIds
+  };
 }
 
 function dependencyRoleNeedsLock(role) {
@@ -471,13 +703,45 @@ export async function validateDesignContext(options) {
   if (options["source-registry"] || options.sourceRegistry) {
     return validateSourceRegistry(options);
   }
-  const contextDir = path.resolve(String(options.context));
+  const requestedContextDir = path.resolve(String(options.context));
   const errors = [];
   const warnings = [];
   const issues = [];
 
-  assert(await pathExists(contextDir), `Context directory does not exist: ${contextDir}`, errors);
-  if (errors.length) return { ok: false, errors, warnings, issues, contextDir };
+  assert(await pathExists(requestedContextDir), `Context directory does not exist: ${requestedContextDir}`, errors);
+  if (errors.length) return { ok: false, errors, warnings, issues, contextDir: requestedContextDir };
+
+  let contextDir = requestedContextDir;
+  let issueRoot;
+  let current;
+  const directManifest = path.join(requestedContextDir, "manifest.json");
+  const rootCurrent = !isVersionDir(requestedContextDir) ? await readCurrentPointer(requestedContextDir).catch(() => undefined) : undefined;
+  if (rootCurrent || !(await pathExists(directManifest))) {
+    current = rootCurrent || await readCurrentPointer(requestedContextDir).catch(() => undefined);
+    if (!current) {
+      errors.push("manifest.json is missing and current.json was not found");
+      return { ok: false, errors, warnings, issues, contextDir: requestedContextDir };
+    }
+    if (current.schemaVersion !== "2.0") errors.push("current.json schemaVersion must be 2.0");
+    if (current.kind !== "pragma-design-context-current") errors.push("current.json kind must be pragma-design-context-current");
+    if (!current.designIssue?.number) errors.push("current.json designIssue.number is required");
+    if (!current.currentVersion) errors.push("current.json currentVersion is required");
+    if (!current.currentManifest) errors.push("current.json currentManifest is required");
+    if (current.currentVersion && current.currentManifest && current.currentManifest !== `versions/${normalizeVersion(current.currentVersion).version}/manifest.json`) {
+      validationIssue(errors, issues, "CURRENT_POINTER_MISMATCH", "current.json currentManifest must point to versions/currentVersion/manifest.json", { currentVersion: current.currentVersion, currentManifest: current.currentManifest });
+    }
+    const resolvedCurrent = await resolveVersionContext({ context: requestedContextDir, version: options.version || "current" }).catch((error) => {
+      errors.push(error.message);
+      return undefined;
+    });
+    if (!resolvedCurrent) return { ok: false, errors, warnings, issues, contextDir: requestedContextDir };
+    contextDir = resolvedCurrent.contextDir;
+    issueRoot = requestedContextDir;
+    assert(await pathExists(resolvedCurrent.manifestPath), `current.json points to missing manifest: ${current.currentManifest}`, errors);
+    if (errors.length) return { ok: false, errors, warnings, issues, contextDir, current };
+  } else if (isVersionDir(requestedContextDir)) {
+    issueRoot = path.dirname(path.dirname(requestedContextDir));
+  }
 
   const manifestPath = path.join(contextDir, "manifest.json");
   assert(await pathExists(manifestPath), "manifest.json is missing", errors);
@@ -494,17 +758,42 @@ export async function validateDesignContext(options) {
   assert(manifest.schemaVersion === "2.0", "manifest.schemaVersion must be 2.0", errors);
   assert(manifest.kind === "pragma-design-context-package", "manifest.kind must be pragma-design-context-package", errors);
   assert(Boolean(manifest.id), "manifest.id is required", errors);
+  assert(Boolean(manifest.version), "manifest.version is required", errors);
+  assert(Number.isInteger(manifest.versionNumber) && manifest.versionNumber > 0, "manifest.versionNumber must be a positive integer", errors);
+  if (manifest.version) {
+    const versionInfo = normalizeVersion(manifest.version);
+    assert(manifest.version === versionInfo.version, "manifest.version must be normalized as vN", errors);
+    assert(manifest.versionNumber === versionInfo.versionNumber, "manifest.versionNumber must match manifest.version", errors);
+    if (isVersionDir(contextDir)) {
+      assert(path.basename(contextDir) === manifest.version, "manifest.version must match versions/vN directory name", errors);
+    }
+  }
+  assert(typeof manifest.changeSummary === "string" && manifest.changeSummary.length > 0, "manifest.changeSummary is required", errors);
+  assert(/^sha256:[0-9a-f]{64}$/i.test(String(manifest.sourceChecksum || "")), "manifest.sourceChecksum must be sha256", errors);
+  assert(/^sha256:[0-9a-f]{64}$/i.test(String(manifest.packageChecksum || "")), "manifest.packageChecksum must be sha256", errors);
   assert(manifest.issue?.provider === "gitea", "manifest.issue.provider must be gitea", errors);
   assert(Number.isInteger(manifest.issue?.number) && manifest.issue.number > 0, "manifest.issue.number must be a positive integer", errors);
   assert(Boolean(manifest.issue?.repo), "manifest.issue.repo is required", errors);
+  assert(manifest.issue?.type === "design", "manifest.issue.type must be design", errors);
+  assert(Array.isArray(manifest.linkedDevelopmentIssues), "manifest.linkedDevelopmentIssues must be an array", errors);
+  assert(typeof manifest.compatibility === "object" && manifest.compatibility !== null, "manifest.compatibility is required", errors);
+  if (manifest.compatibility) {
+    assert(typeof manifest.compatibility.breakingChange === "boolean", "manifest.compatibility.breakingChange must be boolean", errors);
+    assert(typeof manifest.compatibility.requiresDevIssueReview === "boolean", "manifest.compatibility.requiresDevIssueReview must be boolean", errors);
+    assert(Boolean(manifest.compatibility.reason), "manifest.compatibility.reason is required", errors);
+  }
   assert(Boolean(manifest.source?.provider), "manifest.source.provider is required", errors);
   assert(Boolean(manifest.source?.adapter), "manifest.source.adapter is required", errors);
   assert(Boolean(manifest.source?.capturedAt), "manifest.source.capturedAt is required", errors);
+  if (manifest.artifact?.checksum && manifest.packageChecksum) {
+    assert(manifest.artifact.checksum === manifest.packageChecksum, "manifest.artifact.checksum must match manifest.packageChecksum", errors);
+  }
 
   const entrypoints = manifest.entrypoints || {};
   const requiredEntrypoints = [
     "humanHandoff",
     "agentContext",
+    "agentWorkflow",
     "designContext",
     "pixelSpec",
     "layers",
@@ -521,13 +810,28 @@ export async function validateDesignContext(options) {
     assert(Boolean(entrypoints[key]), `manifest.entrypoints.${key} is required`, errors);
   }
 
-  for (const key of ["humanHandoff", "agentContext", "designContext", "pixelSpec", "layers", "tokens", "components", "dependencies", "assetsManifest", "renderInstructions", "visualBaseline"]) {
+  for (const key of ["humanHandoff", "agentContext", "agentWorkflow", "designContext", "pixelSpec", "layers", "tokens", "components", "dependencies", "assetsManifest", "renderInstructions", "visualBaseline"]) {
     if (entrypoints[key]) {
       assert(await pathExists(path.join(contextDir, entrypoints[key])), `${entrypoints[key]} is missing`, errors);
     }
   }
   if (entrypoints.sourceDesignContext) {
     assert(await pathExists(path.join(contextDir, entrypoints.sourceDesignContext)), `${entrypoints.sourceDesignContext} is missing`, errors);
+  }
+
+  let agentWorkflowText = "";
+  if (entrypoints.agentWorkflow) {
+    try {
+      agentWorkflowText = await fs.readFile(path.join(contextDir, entrypoints.agentWorkflow), "utf8");
+    } catch (error) {
+      errors.push(`${entrypoints.agentWorkflow} is missing or unreadable: ${error.message}`);
+    }
+  }
+  if (agentWorkflowText) {
+    const workflowLower = agentWorkflowText.toLowerCase();
+    for (const required of ["read gate", "typography", "progressive disclosure", "business data safety", "css strategy"]) {
+      assert(workflowLower.includes(required), `agent-workflow.md must include ${required}`, errors);
+    }
   }
 
   const designContext = await readEntrypointJson(contextDir, entrypoints, "designContext", errors);
@@ -549,74 +853,35 @@ export async function validateDesignContext(options) {
     assert(Boolean(designContext.assetsManifest), "design-context.assetsManifest is required", errors);
     assert(Boolean(designContext.pixelSpec), "design-context.pixelSpec is required", errors);
     assert(Boolean(designContext.dependencies), "design-context.dependencies is required", errors);
-  }
-
-  const pixelNodeIds = new Set();
-  const pixelFigmaNodeIds = new Set();
-  const dynamicRegionIds = new Set();
-  if (pixelSpec) {
-    assert(pixelSpec.schemaVersion === "2.0", "pixel-spec.schemaVersion must be 2.0", errors);
-    assert(pixelSpec.kind === "pragma-pixel-spec", "pixel-spec.kind must be pragma-pixel-spec", errors);
-    assert(Number.isFinite(Number(pixelSpec.viewport?.width)) && Number(pixelSpec.viewport.width) >= 0, "pixel-spec.viewport.width must be numeric", errors);
-    assert(Number.isFinite(Number(pixelSpec.viewport?.height)) && Number(pixelSpec.viewport.height) >= 0, "pixel-spec.viewport.height must be numeric", errors);
-    assert(Array.isArray(pixelSpec.nodes), "pixel-spec.nodes must be an array", errors);
-    for (const node of asArray(pixelSpec.nodes)) {
-      assert(Boolean(node.id), "pixel-spec node.id is required", errors);
-      assert(Boolean(node.figmaNodeId), `pixel-spec node ${node.id || "<unknown>"} figmaNodeId is required`, errors);
-      assert(Boolean(node.layerRef), `pixel-spec node ${node.id || "<unknown>"} layerRef is required`, errors);
-      assert(Boolean(node.name), `pixel-spec node ${node.id || "<unknown>"} name is required`, errors);
-      assert(Boolean(node.type), `pixel-spec node ${node.id || "<unknown>"} type is required`, errors);
-      assert(node.bounds && Number.isFinite(Number(node.bounds.width)) && Number.isFinite(Number(node.bounds.height)), `pixel-spec node ${node.id || "<unknown>"} bounds are required`, errors);
-      if (Array.isArray(node.children) && node.children.length > 0) {
-        validationIssue(errors, issues, "NORMALIZED_CANONICAL_OWNERSHIP", `pixel-spec node ${node.id || "<unknown>"} must not duplicate layer tree children`, { path: "normalized/pixel-spec.json", nodeId: node.id, field: "children" });
+    assert(Boolean(designContext.agentWorkflow), "design-context.agentWorkflow is required", errors);
+    assert(Array.isArray(designContext.pageRegions) && designContext.pageRegions.length > 0, "design-context.pageRegions must contain at least one Page Region", errors);
+    for (const region of asArray(designContext.pageRegions)) {
+      assert(Boolean(region.id), "design-context pageRegion.id is required", errors);
+      assert(Boolean(region.pixelSpec), `pageRegion ${region.id || "<unknown>"} pixelSpec shard path is required`, errors);
+      if (region.pixelSpec) {
+        assert(Boolean(resolveContextRelative(contextDir, region.pixelSpec)) && await pathExists(resolveContextRelative(contextDir, region.pixelSpec)), `pageRegion ${region.id || "<unknown>"} pixelSpec shard is missing: ${region.pixelSpec}`, errors);
       }
-      if (node.id) pixelNodeIds.add(node.id);
-      if (node.figmaNodeId) pixelFigmaNodeIds.add(node.figmaNodeId);
-    }
-    assert(Array.isArray(pixelSpec.dynamicRegions), "pixel-spec.dynamicRegions must be an array", errors);
-    for (const region of asArray(pixelSpec.dynamicRegions)) {
-      assert(Boolean(region.id), "dynamic region id is required", errors);
-      if (region.id) dynamicRegionIds.add(region.id);
-      for (const nodeId of asArray(region.nodeIds)) {
-        assert(pixelNodeIds.has(nodeId), `dynamic region ${region.id || "<unknown>"} references unknown pixel node ${nodeId}`, errors);
-      }
-    }
-    for (const state of asArray(pixelSpec.states)) {
-      for (const nodeId of asArray(state.nodeIds)) {
-        assert(pixelNodeIds.has(nodeId), `state ${state.name || "<unknown>"} references unknown pixel node ${nodeId}`, errors);
-      }
-    }
-  }
-
-  const layerIds = new Set();
-  const layerFigmaNodeIds = new Set();
-  if (layers) {
-    assert(layers.schemaVersion === "2.0", "layers.schemaVersion must be 2.0", errors);
-    assert(layers.kind === "pragma-layer-tree", "layers.kind must be pragma-layer-tree", errors);
-    assert(Array.isArray(layers.rootNodeIds), "layers.rootNodeIds must be an array", errors);
-    assert(Array.isArray(layers.nodes), "layers.nodes must be an array", errors);
-    for (const node of asArray(layers.nodes)) {
-      assert(Boolean(node.id), "layer node id is required", errors);
-      assert(Boolean(node.figmaNodeId), "layer node figmaNodeId is required", errors);
-      if (node.id) layerIds.add(node.id);
-      if (node.figmaNodeId) layerFigmaNodeIds.add(node.figmaNodeId);
-      for (const field of LAYER_INLINE_FORBIDDEN_FIELDS) {
-        if (hasOwn(node, field)) {
-          validationIssue(errors, issues, "NORMALIZED_CANONICAL_OWNERSHIP", `layers node ${node.id || node.figmaNodeId || "<unknown>"} must not inline ${field}`, { path: "normalized/layers.json", nodeId: node.id || node.figmaNodeId, field });
+      for (const forbidden of ["bounds", "layout", "fills", "strokes", "radius", "shadow", "text", "assetBinding", "placement"]) {
+        if (hasOwn(region, forbidden)) {
+          validationIssue(errors, issues, "NORMALIZED_CANONICAL_OWNERSHIP", `pageRegion ${region.id || "<unknown>"} must not inline ${forbidden}; use pixel-spec shards`, { path: "normalized/design-context.json", pageRegionId: region.id, field: forbidden });
         }
       }
     }
-    for (const rootNodeId of asArray(layers.rootNodeIds)) {
-      assert(layerIds.has(rootNodeId) || layerFigmaNodeIds.has(rootNodeId), `layers.rootNodeIds references unknown node ${rootNodeId}`, errors);
-    }
-    for (const node of asArray(layers.nodes)) {
-      for (const child of asArray(node.children)) {
-        assert(layerIds.has(child) || layerFigmaNodeIds.has(child), `layer ${node.id || node.figmaNodeId || "<unknown>"} references unknown child ${child}`, errors);
-      }
-    }
   }
-  if (pixelSpec && layers) {
-    for (const node of asArray(pixelSpec.nodes)) {
+
+  const pixelValidation = await buildPixelValidationModel({ contextDir, pixelSpec, errors, warnings, issues });
+  const pixelSpecForValidation = pixelValidation.aggregate;
+  const pixelNodeIds = pixelValidation.nodeIds;
+  const pixelFigmaNodeIds = pixelValidation.figmaNodeIds;
+  const dynamicRegionIds = pixelValidation.dynamicRegionIds;
+
+  const layerValidation = await buildLayerValidationModel({ contextDir, layers, errors, warnings, issues });
+  const layersForValidation = layerValidation.aggregate;
+  const layerIds = layerValidation.layerIds;
+  const layerFigmaNodeIds = layerValidation.figmaNodeIds;
+
+  if (pixelSpecForValidation && layersForValidation) {
+    for (const node of asArray(pixelSpecForValidation.nodes)) {
       assert(layerIds.has(node.layerRef) || layerFigmaNodeIds.has(node.layerRef), `pixel-spec node ${node.id || "<unknown>"} references unknown layerRef ${node.layerRef}`, errors);
     }
   }
@@ -627,12 +892,12 @@ export async function validateDesignContext(options) {
     assert(tokens.kind === "pragma-design-tokens", "tokens.kind must be pragma-design-tokens", errors);
     assert(Array.isArray(tokens.tokens), "tokens.tokens must be an array", errors);
   }
-  if (pixelSpec) {
-    const tokenRefs = collectPropertyValues(pixelSpec, (key) => /(^|\b)(tokenId|colorTokenId|fontTokenId|typographyTokenId|radiusTokenId|shadowTokenId)$/.test(key));
+  if (pixelSpecForValidation) {
+    const tokenRefs = collectPropertyValues(pixelSpecForValidation, (key) => /(^|\b)(tokenId|colorTokenId|fontTokenId|typographyTokenId|radiusTokenId|shadowTokenId)$/.test(key));
     for (const tokenId of tokenRefs) {
       assert(tokenIds.has(tokenId), `pixel-spec references unknown tokenId ${tokenId}`, errors);
     }
-    validatePixelTokenMappings(pixelSpec, tokenIds, errors, warnings, issues);
+    validatePixelTokenMappings(pixelSpecForValidation, tokenIds, errors, warnings, issues);
   }
 
   const componentIds = collectComponentIds(components);
@@ -654,8 +919,8 @@ export async function validateDesignContext(options) {
       assert(Array.isArray(components.components), "components.components must be an array", errors);
     }
   }
-  if (pixelSpec) {
-    for (const node of asArray(pixelSpec.nodes)) {
+  if (pixelSpecForValidation) {
+    for (const node of asArray(pixelSpecForValidation.nodes)) {
       const componentId = node.componentRef?.componentId;
       if (componentId) {
         assert(componentIds.has(componentId) || optionalComponentIds.has(componentId) || node.componentRef?.optional || node.componentRef?.external, `pixel-spec node ${node.id} references unknown componentRef ${componentId}`, errors);
@@ -713,7 +978,7 @@ export async function validateDesignContext(options) {
       lockedAssetsSnapshot = repoRoot ? await readSnapshotJson(repoRoot, dependencies.assets, "assets.json", errors) : undefined;
     }
 
-    const componentInstances = collectComponentInstances(components, pixelSpec);
+    const componentInstances = collectComponentInstances(components, pixelSpecForValidation);
     if (dependencies.components?.status === "missing" && dependencies.rules?.ifMissingComponentsAndPageHasInstances === "block" && componentInstances.length) {
       errors.push("dependencies.components is missing while page has component instances");
     }
@@ -785,8 +1050,8 @@ export async function validateDesignContext(options) {
       }
     }
   }
-  if (pixelSpec) {
-    for (const binding of collectAssetBindingRefs(pixelSpec)) {
+  if (pixelSpecForValidation) {
+    for (const binding of collectAssetBindingRefs(pixelSpecForValidation)) {
       assert(assetIds.has(binding.assetId), `pixel-spec references unknown assetId ${binding.assetId}`, errors);
       assert(binding.nodeId || binding.figmaNodeId, `pixel-spec asset binding for ${binding.assetId || "<unknown>"} needs nodeId or figmaNodeId`, errors);
       if (binding.nodeId) assert(pixelNodeIds.has(binding.nodeId), `pixel-spec asset binding references unknown nodeId ${binding.nodeId}`, errors);
@@ -849,7 +1114,7 @@ export async function validateDesignContext(options) {
     warnings.push("checksums.json is missing");
   }
 
-  const secretPath = hasSecretKey(manifest) || hasSecretKey(designContext) || hasSecretKey(pixelSpec) || hasSecretKey(layers) || hasSecretKey(tokens) || hasSecretKey(components) || hasSecretKey(dependencies) || hasSecretKey(assetsManifest);
+  const secretPath = hasSecretKey(manifest) || hasSecretKey(designContext) || hasSecretKey(pixelSpec) || hasSecretKey(pixelSpecForValidation) || hasSecretKey(layers) || hasSecretKey(layersForValidation) || hasSecretKey(tokens) || hasSecretKey(components) || hasSecretKey(dependencies) || hasSecretKey(assetsManifest);
   assert(!secretPath, `package metadata contains a forbidden secret-like key: ${secretPath}`, errors);
 
   if (manifest.artifact?.storage === "gitea-generic-package") {

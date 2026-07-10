@@ -1,0 +1,393 @@
+{
+  "schemaVersion": "2.0",
+  "kind": "pragma-pixel-spec-frame",
+  "id": "design-issue-102-v1-frame-map-monitoring-page",
+  "frame": {
+    "id": "frame-map-monitoring-page",
+    "figmaNodeId": "1:23",
+    "name": "Map monitoring page",
+    "rootLayerId": "node-1-23",
+    "screenshot": "screenshots/main-frame.webp"
+  },
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "nodes": [
+    {
+      "id": "node-1-23",
+      "figmaNodeId": "1:23",
+      "layerRef": "node-1-23",
+      "name": "Map Monitoring Page",
+      "type": "frame",
+      "zIndex": 0,
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "layout": {
+        "position": "absolute",
+        "overflow": "visible"
+      },
+      "fills": [
+        {
+          "type": "solid",
+          "color": {
+            "resolvedValue": "#07131C"
+          },
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "radius": null,
+      "shadow": [],
+      "opacity": 1,
+      "blendMode": "normal",
+      "text": null,
+      "assetBinding": null,
+      "componentRef": null,
+      "state": "default",
+      "availableStates": []
+    },
+    {
+      "id": "node-1-24",
+      "figmaNodeId": "1:24",
+      "layerRef": "node-1-24",
+      "name": "Top Filter Bar",
+      "type": "frame",
+      "zIndex": 1,
+      "bounds": {
+        "x": 24,
+        "y": 24,
+        "width": 760,
+        "height": 64
+      },
+      "layout": {
+        "mode": "horizontal",
+        "position": "absolute",
+        "overflow": "visible",
+        "gap": 12,
+        "padding": {
+          "top": 8,
+          "right": 12,
+          "bottom": 8,
+          "left": 12
+        }
+      },
+      "fills": [
+        {
+          "type": "solid",
+          "color": {
+            "tokenId": "color-surface-panel",
+            "resolvedValue": "#0D2636"
+          },
+          "opacity": 0.92
+        }
+      ],
+      "strokes": [
+        {
+          "color": {
+            "resolvedValue": "#2A5D77"
+          },
+          "width": 1,
+          "position": "inside"
+        }
+      ],
+      "radius": {
+        "tokenId": "radius-panel",
+        "resolvedValue": {
+          "topLeft": 12,
+          "topRight": 12,
+          "bottomRight": 12,
+          "bottomLeft": 12
+        }
+      },
+      "shadow": [],
+      "opacity": 1,
+      "blendMode": "normal",
+      "text": null,
+      "assetBinding": null,
+      "componentRef": {
+        "componentId": "component-filter-bar",
+        "variant": {
+          "size": "default"
+        }
+      },
+      "state": "default",
+      "availableStates": []
+    },
+    {
+      "id": "node-1-30",
+      "figmaNodeId": "1:30",
+      "layerRef": "node-1-30",
+      "name": "Dynamic Map Surface",
+      "type": "frame",
+      "zIndex": 3,
+      "bounds": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 1080
+      },
+      "layout": {
+        "position": "absolute",
+        "overflow": "visible"
+      },
+      "fills": [
+        {
+          "type": "solid",
+          "color": {
+            "resolvedValue": "#09202E"
+          },
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "radius": null,
+      "shadow": [],
+      "opacity": 1,
+      "blendMode": "normal",
+      "text": null,
+      "assetBinding": null,
+      "componentRef": null,
+      "state": "default",
+      "availableStates": []
+    },
+    {
+      "id": "node-1-40",
+      "figmaNodeId": "1:40",
+      "layerRef": "node-1-40",
+      "name": "Drone Marker Icon",
+      "type": "image",
+      "zIndex": 4,
+      "bounds": {
+        "x": 920,
+        "y": 520,
+        "width": 32,
+        "height": 32
+      },
+      "layout": {
+        "position": "absolute",
+        "overflow": "visible"
+      },
+      "fills": [],
+      "strokes": [],
+      "radius": null,
+      "shadow": [],
+      "opacity": 1,
+      "blendMode": "normal",
+      "text": null,
+      "assetBinding": {
+        "nodeId": "node-1-40",
+        "figmaNodeId": "1:40",
+        "assetId": "asset-drone-icon",
+        "fit": "contain",
+        "crop": null,
+        "placement": {
+          "x": 920,
+          "y": 520,
+          "width": 32,
+          "height": 32
+        },
+        "sourceNodeIds": [
+          "node-1-40"
+        ],
+        "usedByNodeIds": [
+          "node-1-40"
+        ],
+        "scope": "page"
+      },
+      "componentRef": null,
+      "state": "default",
+      "availableStates": []
+    },
+    {
+      "id": "node-1-50",
+      "figmaNodeId": "1:50",
+      "layerRef": "node-1-50",
+      "name": "Right Event Drawer",
+      "type": "frame",
+      "zIndex": 5,
+      "bounds": {
+        "x": 1544,
+        "y": 96,
+        "width": 352,
+        "height": 880
+      },
+      "layout": {
+        "position": "absolute",
+        "overflow": "visible"
+      },
+      "fills": [
+        {
+          "type": "solid",
+          "color": {
+            "tokenId": "color-surface-panel",
+            "resolvedValue": "#0D2636"
+          },
+          "opacity": 0.88
+        }
+      ],
+      "strokes": [],
+      "radius": {
+        "resolvedValue": {
+          "topLeft": 16,
+          "topRight": 16,
+          "bottomRight": 16,
+          "bottomLeft": 16
+        }
+      },
+      "shadow": [],
+      "opacity": 1,
+      "blendMode": "normal",
+      "text": null,
+      "assetBinding": {
+        "nodeId": "node-1-50",
+        "figmaNodeId": "1:50",
+        "assetId": "asset-panel-bg",
+        "fit": "cover",
+        "crop": {
+          "x": 0,
+          "y": 0,
+          "width": 1,
+          "height": 1
+        },
+        "placement": {
+          "x": 1544,
+          "y": 96,
+          "width": 352,
+          "height": 880
+        },
+        "sourceNodeIds": [
+          "node-1-50"
+        ],
+        "usedByNodeIds": [
+          "node-1-50"
+        ],
+        "scope": "page"
+      },
+      "componentRef": {
+        "componentId": "component-warning-card",
+        "variant": {
+          "severity": "normal"
+        }
+      },
+      "state": "default",
+      "availableStates": []
+    },
+    {
+      "id": "node-1-25",
+      "figmaNodeId": "1:25",
+      "layerRef": "node-1-25",
+      "name": "Filter Label",
+      "type": "text",
+      "zIndex": 2,
+      "bounds": {
+        "x": 48,
+        "y": 44,
+        "width": 96,
+        "height": 24
+      },
+      "layout": {
+        "position": "absolute",
+        "overflow": "visible"
+      },
+      "fills": [],
+      "strokes": [],
+      "radius": null,
+      "shadow": [],
+      "opacity": 1,
+      "blendMode": "normal",
+      "text": {
+        "content": "Region",
+        "fontFamily": "Source Han Sans SC",
+        "fontWeight": 500,
+        "fontSize": 16,
+        "lineHeight": 24,
+        "letterSpacing": 0,
+        "align": "left",
+        "color": {
+          "tokenId": "color-text-primary",
+          "resolvedValue": "#EAF7FF"
+        },
+        "typography": {
+          "resolvedValue": {
+            "fontFamily": "Source Han Sans SC",
+            "fontWeight": 500,
+            "fontSize": 16,
+            "lineHeight": 24,
+            "letterSpacing": 0
+          }
+        }
+      },
+      "assetBinding": null,
+      "componentRef": null,
+      "state": "default",
+      "availableStates": []
+    }
+  ],
+  "assetBindings": [
+    {
+      "nodeId": "node-1-40",
+      "figmaNodeId": "1:40",
+      "assetId": "asset-drone-icon",
+      "fit": "contain",
+      "crop": null,
+      "placement": {
+        "x": 920,
+        "y": 520,
+        "width": 32,
+        "height": 32
+      },
+      "sourceNodeIds": [
+        "node-1-40"
+      ],
+      "usedByNodeIds": [
+        "node-1-40"
+      ],
+      "scope": "page"
+    },
+    {
+      "nodeId": "node-1-50",
+      "figmaNodeId": "1:50",
+      "assetId": "asset-panel-bg",
+      "fit": "cover",
+      "crop": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      },
+      "placement": {
+        "x": 1544,
+        "y": 96,
+        "width": 352,
+        "height": 880
+      },
+      "sourceNodeIds": [
+        "node-1-50"
+      ],
+      "usedByNodeIds": [
+        "node-1-50"
+      ],
+      "scope": "page"
+    }
+  ],
+  "availableStates": [],
+  "dynamicRegions": [
+    {
+      "id": "region-dynamic-map-surface-node-1-30-dynamic",
+      "pageRegionId": "region-dynamic-map-surface-node-1-30",
+      "name": "Dynamic Map Surface",
+      "type": "map",
+      "nodeIds": [
+        "node-1-30"
+      ],
+      "rendering": "implementation-defined",
+      "pixelMatchRequired": false,
+      "notes": "The center map uses the production map service. Treat the Figma map as an intent reference for control placement, visual balance, and overlay density."
+    }
+  ]
+}

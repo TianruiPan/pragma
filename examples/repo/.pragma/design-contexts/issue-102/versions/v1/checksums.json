@@ -2,7 +2,7 @@
   "schemaVersion": "2.0",
   "kind": "pragma-design-checksums",
   "algorithm": "sha256",
-  "generatedAt": "2026-07-07T10:31:45.325Z",
+  "generatedAt": "2026-07-09T02:35:45.339Z",
   "files": [
     {
       "path": "assets/icons/drone.svg",
@@ -14,23 +14,27 @@
     },
     {
       "path": "handoff/README.md",
-      "checksum": "sha256:498322a543de592734fec82d30d0a125c9bec71530412a105120d976d877cbb9"
+      "checksum": "sha256:d5b22859a8bf9977365327f978a33d7658bb5d4e5abd84ed7f11c06a560a1744"
     },
     {
       "path": "manifest.json",
-      "checksum": "sha256:095fcc56efe49b88d69a3c9bd71d5ed7834c11a81a47b3b2fd528ab21ad0c51d"
+      "checksum": "sha256:2e8ea870cb961e25af685195ea660552efd6eca73dfad00d66aed3aab717372a"
     },
     {
       "path": "normalized/agent-context.md",
-      "checksum": "sha256:dc040d80dede9adf49581fcf5513bff48492e157937c167e60bd0f9a2d9b9af0"
+      "checksum": "sha256:d2ace32dcad74d68d38bb8619ceaa453a15bf6702b5297340246929aa9bb7383"
+    },
+    {
+      "path": "normalized/agent-workflow.md",
+      "checksum": "sha256:ac93fea41fde64cc8e1b30a4ada2bb415d84e109c3ac1cc43f5ec4a61ada940a"
     },
     {
       "path": "normalized/assets.json",
-      "checksum": "sha256:9d250a6d272a66d88cc13d2b8cfd1eba2c7e378f9f2f8ffc537fda2c528652ee"
+      "checksum": "sha256:1fc97ccbe8cef64bdb4e74bb87317084bc4a2d9f707430ee544c251a86a6203b"
     },
     {
       "path": "normalized/components.json",
-      "checksum": "sha256:2db8a9d92e816f536d33cd82fc18fc1c73f75104156acff02d41101387efaf0c"
+      "checksum": "sha256:27ee1f4802f8a2798287fad469c0d6d791ebf1dbaddc5a33a9ec31d5cc92ecdc"
     },
     {
       "path": "normalized/dependencies.json",
@@ -38,19 +42,47 @@
     },
     {
       "path": "normalized/design-context.json",
-      "checksum": "sha256:de3af9233e24f1d60aeca441a0e811685e1b5733ea648a97ae972f52f6d1eabd"
+      "checksum": "sha256:7635e0ed054f94d87462dd9f1ba2b0000433e209cfe2173d0ffee87700b68819"
     },
     {
       "path": "normalized/layers.json",
       "checksum": "sha256:beceea79c53fd03960373eb6a49dfda915e1086d5938c68643d6bab8ad8a05d1"
     },
     {
+      "path": "normalized/layers/frames/frame-map-monitoring-page.tree.json",
+      "checksum": "sha256:f8fc55d6e093b0e151a84ce4e0e84d02776a93fd066a5a0680a1be7131c834fa"
+    },
+    {
+      "path": "normalized/layers/index.json",
+      "checksum": "sha256:0fb5e57c2f5c0d666af20733e6e131b8d4ba5b7e17219de82c9d1ec429a794ee"
+    },
+    {
       "path": "normalized/pixel-spec.json",
-      "checksum": "sha256:af0b14f9096672947b3d2b77322e2dfe71565fd73f30b6ff39fbe8970907ba25"
+      "checksum": "sha256:7a4b428bfc5f26c76617198a2f955bf5524779c2bf89563f0dae3c22ef649c24"
+    },
+    {
+      "path": "normalized/pixel-spec/frames/frame-map-monitoring-page.json",
+      "checksum": "sha256:d1ee693ac70799785e63b22e9c2120ed9657abcfc2edf7552d28e6fb366dc554"
+    },
+    {
+      "path": "normalized/pixel-spec/index.json",
+      "checksum": "sha256:f0d5b59dbf05fcabc74fb81deeed266c434a17cbbb2da56fafcfe080ab9fc91c"
+    },
+    {
+      "path": "normalized/pixel-spec/regions/region-dynamic-map-surface-node-1-30.json",
+      "checksum": "sha256:a7ca7d7e4766615c8654f440e191b97ed368485468d4a47df8291f481f527d7c"
+    },
+    {
+      "path": "normalized/pixel-spec/regions/region-right-event-drawer-node-1-50.json",
+      "checksum": "sha256:dd8d5eb1632e94b31921d4e2a68a7bc12571cf042c17efd932d8d534362804bb"
+    },
+    {
+      "path": "normalized/pixel-spec/regions/region-top-filter-bar-node-1-24.json",
+      "checksum": "sha256:716e8df4d174b1fe14eebb7de885966494423d691b77559258dbdd5b0931174a"
     },
     {
       "path": "normalized/render-instructions.md",
-      "checksum": "sha256:343558635faacbbd2189fb238cb8dde5a2ba09c9e2772971a6adb642a8e74a9d"
+      "checksum": "sha256:956ec8f2c4d7ac35961d0f87ec95e90696fca0553e55ce55629203bda015f293"
     },
     {
       "path": "normalized/tokens.json",
@@ -102,7 +134,7 @@
     },
     {
       "path": "validation/visual-baseline.json",
-      "checksum": "sha256:94136b45bb273e78a7a2961ce6178c2dc29c6c3228850390d05ea46fc9d07a62"
+      "checksum": "sha256:8ae1cd0af17a6745ea7321b4b0c2f04a69865804c6d41891d1990fe95cf243fc"
     }
   ]
 }

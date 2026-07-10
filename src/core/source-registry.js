@@ -4,7 +4,7 @@ import { CliError } from "./errors.js";
 import { generateChecksums, sha256File, sha256Text } from "./checksum.js";
 import { parseFigmaUrl, figmaNodeIdForPath, normalizeFigmaNodeId } from "./figma-url.js";
 import { ensureDir, listFilesRecursive, pathExists, readJson, relativePosix, safeJoin, writeJson } from "./fs.js";
-import { asArray, normalizeAssets, pruneUnreferencedAssetFiles } from "./normalize.js";
+import { asArray, extractSelectionFrames, normalizeAssets, pruneUnreferencedAssetFiles } from "./normalize.js";
 import { buildComponents, buildLayerModel, buildTokens } from "./pixel-normalize.js";
 
 const ROLES = new Set(["components", "assets"]);
@@ -214,11 +214,20 @@ async function materializeSnapshot({ role, inputDir, snapshotDir }) {
   await generateChecksums(snapshotDir);
 }
 
-function frameNameFromInput(capture, role, frameNodeId) {
-  const roleFrames = asArray(capture.figma?.frames?.[role]);
+function framesForInputRole(capture, selection, role) {
+  return [
+    ...asArray(capture.figma?.frames?.[role]),
+    ...extractSelectionFrames(selection, role)
+  ];
+}
+
+function frameNameFromInput(capture, selection, role, frameNodeId) {
+  const roleFrames = framesForInputRole(capture, selection, role);
   const roleFrame = roleFrames.find((frame) => normalizeFigmaNodeId(frame.nodeId || frame.id) === frameNodeId) || roleFrames[0];
   if (roleFrame?.name) return roleFrame.name;
-  const nodes = asArray(capture.figma?.frames?.page).concat(asArray(capture.figma?.nodeIds).map((nodeId) => ({ nodeId })));
+  const nodes = asArray(capture.figma?.frames?.page)
+    .concat(extractSelectionFrames(selection, "page"))
+    .concat(asArray(capture.figma?.nodeIds).map((nodeId) => ({ nodeId })));
   return nodes.find((node) => normalizeFigmaNodeId(node.nodeId || node.id) === frameNodeId)?.name;
 }
 
@@ -226,12 +235,13 @@ export async function addDesignSourceSnapshot(options) {
   const inputDir = path.resolve(String(options.input || options["capture-dir"] || options.captureDir || ""));
   if (!inputDir || !(await pathExists(inputDir))) throw new CliError("--input is required and must point to a captured components/assets directory.");
   const capture = await readJson(path.join(inputDir, "capture.json"), {}).catch(() => ({}));
+  const selection = await readJson(path.join(inputDir, "figma", "selection.json"), {}).catch(() => ({}));
   const parsedUrl = parseFigmaUrl(options.url || options["figma-url"] || options.figmaUrl || capture.figma?.url);
   const fileKey = options["file-key"] || options.fileKey || parsedUrl.fileKey || capture.figma?.fileKey;
   const repoPath = repoPathFromOptions(options, capture);
   const role = String(options.role || options.type || "").toLowerCase();
   if (!ROLES.has(role)) throw new CliError("--role must be components or assets.");
-  const captureRoleFrame = asArray(capture.figma?.frames?.[role])[0];
+  const captureRoleFrame = framesForInputRole(capture, selection, role)[0];
   const frameNodeId = normalizeFigmaNodeId(options.frame || options["frame-node-id"] || options.frameNodeId || options[`${role}-frame`] || captureRoleFrame?.nodeId || captureRoleFrame?.id || parsedUrl.nodeId);
   if (!frameNodeId) throw new CliError("--frame-node-id is required for source add/sync snapshots.");
 
@@ -253,7 +263,7 @@ export async function addDesignSourceSnapshot(options) {
   const entry = existing || {
     snapshotId,
     frameNodeId,
-    name: options.name || frameNameFromInput(capture, role, frameNodeId),
+    name: options.name || frameNameFromInput(capture, selection, role, frameNodeId),
     checksum,
     contentSha,
     path: relPath,
