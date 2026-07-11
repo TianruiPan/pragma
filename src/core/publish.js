@@ -6,37 +6,17 @@ import { generateChecksums, sha256File } from "./checksum.js";
 import { packDesignContext } from "./pack.js";
 import { assertValidDesignContext } from "./validate.js";
 import { currentPathForIssueRoot, issueRootDir, manifestChecksum, normalizeVersion, resolveVersionContext, versionRelative, writeCurrentPointer } from "./versioning.js";
+import { pragmaContextObjectKey, resolveMinioPublishConfig, uploadImmutableMinioObject } from "./minio.js";
 
 function mbToBytes(value) {
   return Number(value) * 1024 * 1024;
 }
-
-function normalizeBaseUrl(value) {
-  return String(value || "").replace(/\/+$/, "");
-}
-
 
 async function pruneRepoPayload(contextDir, fileName) {
   await fs.rm(path.join(contextDir, "assets"), { recursive: true, force: true });
   await fs.rm(path.join(contextDir, "source"), { recursive: true, force: true });
   await fs.rm(path.join(contextDir, fileName), { force: true });
   await generateChecksums(contextDir);
-}
-
-async function uploadToGitea({ zipPath, downloadUrl, token }) {
-  const body = await fs.readFile(zipPath);
-  const response = await fetch(downloadUrl, {
-    method: "PUT",
-    headers: {
-      Authorization: `token ${token}`,
-      "Content-Type": "application/zip"
-    },
-    body
-  });
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new CliError(`Gitea package upload failed: HTTP ${response.status} ${text}`);
-  }
 }
 
 export async function publishDesignContext(options) {
@@ -107,10 +87,7 @@ export async function publishDesignContext(options) {
     manifest.artifact = {
       storage: "repo",
       owner: manifest.issue.repo?.split("/")?.[0],
-      packageName: "pragma-design-context",
-      packageVersion: `issue-${issueNumber}-${manifest.version}`,
       fileName: null,
-      downloadUrl: null,
       checksum,
       path: versionRelative(issueNumber, manifest.version)
     };
@@ -136,28 +113,30 @@ export async function publishDesignContext(options) {
     };
   }
 
-  const baseUrl = normalizeBaseUrl(options["gitea-base-url"] || options.giteaBaseUrl);
-  const owner = options.owner || manifest.issue.repo.split("/")[0];
-  const packageName = options["package-name"] || options.packageName || "pragma-design-context";
-  const packageVersion = `issue-${issueNumber}-${manifest.version}`;
   const fileName = options["file-name"] || options.fileName || "context.zip";
-  if (!baseUrl) throw new CliError("--gitea-base-url is required when publishing packages over the threshold.");
-  if (!owner) throw new CliError("--owner is required when publishing packages over the threshold.");
-  const downloadUrl = `${baseUrl}/api/packages/${encodeURIComponent(owner)}/generic/${encodeURIComponent(packageName)}/${encodeURIComponent(packageVersion)}/${encodeURIComponent(fileName)}`;
+  const minio = resolveMinioPublishConfig(options, { credentialsRequired: !dryRun });
+  const objectKey = pragmaContextObjectKey({
+    objectPrefix: minio.objectPrefix,
+    repo: manifest.issue.repo,
+    designIssue: issueNumber,
+    version: manifest.version,
+    fileName
+  });
 
   const zipPath = path.resolve(String(options.zip || path.join(contextDir, fileName)));
   await packDesignContext({ context: contextDir, zip: zipPath });
   const checksum = await sha256File(zipPath);
+  const archiveSizeBytes = (await fs.stat(zipPath)).size;
   manifest.packageChecksum = checksum;
 
   manifest.artifact = {
-    storage: "gitea-generic-package",
-    owner,
-    packageName,
-    packageVersion,
+    storage: "minio-s3",
+    bucket: minio.bucket,
+    objectKey,
+    uri: `s3://${minio.bucket}/${objectKey}`,
     fileName,
-    downloadUrl,
     checksum,
+    archiveSizeBytes,
     publishedAt: new Date().toISOString(),
     dryRun
   };
@@ -166,10 +145,15 @@ export async function publishDesignContext(options) {
 
   const pruneRepo = options["prune-repo"] || options.pruneRepo;
   if (!dryRun) {
-    const tokenEnv = options["token-env"] || options.tokenEnv;
-    const token = options.token || (tokenEnv ? process.env[tokenEnv] : undefined);
-    if (!token) throw new CliError("A Gitea token is required. Use --token or --token-env.");
-    await uploadToGitea({ zipPath, downloadUrl, token });
+    await uploadImmutableMinioObject({
+      config: minio,
+      bucket: minio.bucket,
+      objectKey,
+      zipPath,
+      checksum,
+      sizeBytes: archiveSizeBytes,
+      client: options.minioClient
+    });
   }
   if (pruneRepo) {
     if (dryRun) throw new CliError("--prune-repo requires a real upload; omit --dry-run first.");
@@ -187,7 +171,7 @@ export async function publishDesignContext(options) {
   });
 
   return {
-    mode: "gitea-generic-package",
+    mode: "minio-s3",
     contextDir,
     zipPath: pruneRepo ? undefined : zipPath,
     sizeBytes,

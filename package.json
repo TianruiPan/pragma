@@ -16,5 +16,8 @@
     "sample:validate": "node src/cli.js design validate --context examples/repo/.pragma/design-contexts/issue-102",
     "sample:read": "node src/cli.js design read --repo examples/repo --issue 102 --summary-only",
     "sample:pack-from-figma-capture": "node src/cli.js design pack-from-figma-capture --input examples/figma-mcp-input --repo examples/repo --force --threshold-mb 20"
+  },
+  "dependencies": {
+    "minio": "^8.0.7"
   }
 }

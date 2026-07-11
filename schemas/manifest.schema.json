@@ -175,7 +175,7 @@
         "storage": {
           "enum": [
             "repo",
-            "gitea-generic-package"
+            "minio-s3"
           ]
         },
         "path": {
@@ -184,17 +184,24 @@
         "owner": {
           "type": "string"
         },
-        "packageName": {
+        "bucket": {
           "type": "string"
         },
-        "packageVersion": {
+        "objectKey": {
           "type": "string"
         },
         "fileName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "uri": {
           "type": "string"
         },
-        "downloadUrl": {
-          "type": "string"
+        "archiveSizeBytes": {
+          "type": "integer",
+          "minimum": 1
         },
         "checksum": {
           "type": "string",
@@ -207,6 +214,27 @@
           "type": "boolean"
         }
       },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "storage": {
+                "const": "minio-s3"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "bucket",
+              "objectKey",
+              "uri",
+              "fileName",
+              "checksum",
+              "archiveSizeBytes"
+            ]
+          }
+        }
+      ],
       "additionalProperties": true
     }
   },
