@@ -31,6 +31,25 @@ async function readJson(file) {
   return JSON.parse(await fs.readFile(file, "utf8"));
 }
 
+async function listZipEntries(file) {
+  const archive = await fs.readFile(file);
+  const endSignature = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
+  const end = archive.lastIndexOf(endSignature);
+  assert.notEqual(end, -1, "zip end-of-central-directory record is missing");
+  const count = archive.readUInt16LE(end + 10);
+  let offset = archive.readUInt32LE(end + 16);
+  const entries = [];
+  for (let index = 0; index < count; index += 1) {
+    assert.equal(archive.readUInt32LE(offset), 0x02014b50, "zip central-directory entry is invalid");
+    const nameLength = archive.readUInt16LE(offset + 28);
+    const extraLength = archive.readUInt16LE(offset + 30);
+    const commentLength = archive.readUInt16LE(offset + 32);
+    entries.push(archive.subarray(offset + 46, offset + 46 + nameLength).toString("utf8").replaceAll("\\", "/"));
+    offset += 46 + nameLength + extraLength + commentLength;
+  }
+  return entries;
+}
+
 async function writeFakePng(file, width, height) {
   const png = Buffer.alloc(24);
   png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -615,6 +634,9 @@ test("pack writes zip outside context and publish keeps repo mode zip-free", asy
   assert.match(packResult.checksum, /^sha256:/);
   assert.notEqual(path.dirname(packResult.zipPath), contextDir);
   await fs.access(packResult.zipPath);
+  const entries = await listZipEntries(packResult.zipPath);
+  assert.equal(entries.includes("manifest.json"), false);
+  assert.equal(entries.includes("checksums.json"), false);
   await assert.rejects(fs.access(path.join(contextDir, "context.zip")));
 
   const publish = await run(["design", "publish", "--context", contextDir, "--threshold-mb", "20"]);
@@ -681,10 +703,12 @@ test("publish uploads an immutable MinIO object before advancing current", async
   await run(["design", "ingest", "--input", input, "--repo", repo]);
   const contextDir = path.join(repo, ".pragma", "design-contexts", "issue-102", "versions", "v1");
   const uploads = [];
-  const previousAccessKey = process.env.PRAGMA_MINIO_PUBLISH_ACCESS_KEY;
-  const previousSecretKey = process.env.PRAGMA_MINIO_PUBLISH_SECRET_KEY;
-  process.env.PRAGMA_MINIO_PUBLISH_ACCESS_KEY = "test-publisher";
-  process.env.PRAGMA_MINIO_PUBLISH_SECRET_KEY = "test-secret";
+  const previousAccessKey = process.env.PRAGMA_CONTEXT_MINIO_ACCESS_KEY;
+  const previousSecretKey = process.env.PRAGMA_CONTEXT_MINIO_SECRET_KEY;
+  const previousObjectPrefix = process.env.PRAGMA_CONTEXT_MINIO_OBJECT_PREFIX;
+  process.env.PRAGMA_CONTEXT_MINIO_ACCESS_KEY = "test-publisher";
+  process.env.PRAGMA_CONTEXT_MINIO_SECRET_KEY = "test-secret";
+  process.env.PRAGMA_CONTEXT_MINIO_OBJECT_PREFIX = "test-pragma-context";
   try {
     const result = await publishDesignContext({
       context: contextDir,
@@ -705,14 +729,18 @@ test("publish uploads an immutable MinIO object before advancing current", async
     assert.equal(result.mode, "minio-s3");
     assert.equal(uploads.length, 1);
     assert.equal(uploads[0].bucket, "product-project-dev-lab");
-    assert.equal(uploads[0].objectKey, "pragma-design-context/example-org/demo-repo/issue-102/v1/context.zip");
-    assert.equal(uploads[0].metadata["X-Amz-Meta-Pragma-Sha256"], result.manifest.packageChecksum);
+    assert.equal(uploads[0].objectKey, "test-pragma-context/example-org/demo-repo/issue-102/v1/context.zip");
+    assert.equal(uploads[0].metadata["X-Amz-Meta-Pragma-Sha256"], result.manifest.artifact.checksum);
+    assert.notEqual(result.manifest.packageChecksum, result.manifest.artifact.checksum);
+    await run(["design", "validate", "--context", contextDir]);
     await fs.access(path.join(repo, ".pragma", "design-contexts", "issue-102", "current.json"));
   } finally {
-    if (previousAccessKey === undefined) delete process.env.PRAGMA_MINIO_PUBLISH_ACCESS_KEY;
-    else process.env.PRAGMA_MINIO_PUBLISH_ACCESS_KEY = previousAccessKey;
-    if (previousSecretKey === undefined) delete process.env.PRAGMA_MINIO_PUBLISH_SECRET_KEY;
-    else process.env.PRAGMA_MINIO_PUBLISH_SECRET_KEY = previousSecretKey;
+    if (previousAccessKey === undefined) delete process.env.PRAGMA_CONTEXT_MINIO_ACCESS_KEY;
+    else process.env.PRAGMA_CONTEXT_MINIO_ACCESS_KEY = previousAccessKey;
+    if (previousSecretKey === undefined) delete process.env.PRAGMA_CONTEXT_MINIO_SECRET_KEY;
+    else process.env.PRAGMA_CONTEXT_MINIO_SECRET_KEY = previousSecretKey;
+    if (previousObjectPrefix === undefined) delete process.env.PRAGMA_CONTEXT_MINIO_OBJECT_PREFIX;
+    else process.env.PRAGMA_CONTEXT_MINIO_OBJECT_PREFIX = previousObjectPrefix;
   }
 });
 

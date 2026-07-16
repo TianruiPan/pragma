@@ -28,6 +28,8 @@ Issue model:
 
 Development consumption is CLI-free: the Governance Runner resolves and pins the package before starting the Codex turn, then the Agent reads the supplied descriptor and files directly. Developer machines, Codex app-server, and development Agents do not install or invoke Pragma CLI.
 
+The current cross-repository boundary is `pragma-integration/v2`. `manifest.packageChecksum` identifies the canonical payload and excludes control/generated files (`manifest.json`, `checksums.json`, `context.zip`, `handoff/issue-fragment.md`, and `handoff/pipeline-summary.json`). `manifest.artifact.checksum` verifies storage bytes: it equals the package checksum for repo storage and is the exact zip SHA-256 for MinIO. MinIO archives contain payload only; the manifest on the pinned default-branch commit remains authoritative.
+
 Producer/publisher deployments that invoke Pragma commands verify the installed CLI with `pragma --version --json`; see `docs/compatibility-handshake.md`. The shared development-consumption boundary is documented in `docs/development-consumption-contract.md`.
 
 ## Folder Contract
@@ -121,8 +123,8 @@ For `requires_design_issue: true`, the Governance Runner performs this sequence 
 
 1. pin the workspace commit containing the merged design PR;
 2. resolve `current.json` to an immutable manifest;
-3. verify the repo, Design Issue, linked Dev Issue, version, checksum, and required entrypoints;
-4. materialize a MinIO object into a checksum-keyed cache when required;
+3. verify the repo, Design Issue, linked Dev Issue, version, package checksum, and required entrypoints;
+4. materialize a MinIO object into an artifact-checksum-keyed cache when required;
 5. pass `pragma-context-descriptor/v1` and read-only entrypoints to the Codex app-server adapter.
 
 The Agent reads those entrypoints directly. It does not run `pragma design read`, obtain MinIO credentials, download objects, or follow a newer `current.json` during the turn. `pragma design read` remains a producer smoke-check and human diagnostic command.
@@ -172,17 +174,19 @@ node src/cli.js design validate --repo <repo-path> --source-registry [--file-key
 `publish` uses MinIO when the package is larger than the threshold. Put publisher credentials in environment variables; do not pass them on the command line:
 
 ```bash
-export PRAGMA_MINIO_PUBLISH_ACCESS_KEY=...
-export PRAGMA_MINIO_PUBLISH_SECRET_KEY=...
+export PRAGMA_CONTEXT_MINIO_ENDPOINT=http://218.11.1.13:9000
+export PRAGMA_CONTEXT_MINIO_BUCKET=product-project-dev-lab
+export PRAGMA_CONTEXT_MINIO_REGION=us-east-1
+export PRAGMA_CONTEXT_MINIO_OBJECT_PREFIX=pragma-design-context
+export PRAGMA_CONTEXT_MINIO_ACCESS_KEY=...
+export PRAGMA_CONTEXT_MINIO_SECRET_KEY=...
 node src/cli.js design publish \
   --context .pragma/design-contexts/issue-102/versions/v1 \
-  --minio-endpoint http://218.11.1.13:9000 \
-  --minio-bucket product-project-dev-lab \
   --prune-repo
 ```
 
-The deterministic object key is `pragma-design-context/<owner>/<repo>/issue-<design-issue>/<version>/context.zip`. `--prune-repo` removes large `assets/`, `source/`, and local `context.zip` after a real MinIO upload, leaving the repo with manifest, normalized specs, handoff notes, visual baseline, and screenshots.
+The deterministic object key is `pragma-design-context/<owner>/<repo>/issue-<design-issue>/<version>/context.zip`. The archive excludes manifest/checksum control files. `--prune-repo` removes large `assets/`, `source/`, and local `context.zip` after a real MinIO upload, leaving the repo with the authoritative manifest, normalized specs, handoff notes, visual baseline, and screenshots.
 
 `current.json` advances only after a non-dry-run publish succeeds. A MinIO `--dry-run` can prepare and validate the version, but it never marks that version as current.
 
-Pragma only produces context files and markdown fragments. It does not create/update Gitea issues, move issue state, or establish dependencies; those actions belong to the generic Issue writer.
+Pragma only produces context files and optional markdown fragments. It does not create/update Gitea issues, move issue state, or establish dependencies; Governance Design Gate/finalizer owns completion backfill and controlled state changes.

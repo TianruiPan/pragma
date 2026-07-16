@@ -35,3 +35,21 @@ export async function generateChecksums(contextDir) {
   await writeJson(path.join(contextDir, "checksums.json"), checksums);
   return checksums;
 }
+
+export async function canonicalPackageChecksum(contextDir) {
+  const files = await listFilesRecursive(contextDir);
+  const records = [];
+  for (const file of files) {
+    const rel = relativePosix(contextDir, file);
+    if ([
+      "manifest.json",
+      "checksums.json",
+      "context.zip",
+      "handoff/issue-fragment.md",
+      "handoff/pipeline-summary.json"
+    ].includes(rel)) continue;
+    records.push({ path: rel, checksum: await sha256File(file) });
+  }
+  records.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
+  return sha256Text(records.map((record) => `${record.path}\0${record.checksum}`).join("\n"));
+}

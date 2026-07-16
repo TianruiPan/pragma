@@ -24,17 +24,17 @@ For `requires_design_issue: true`, the Runner resolves the package before starti
 2. pin the workspace commit that contains the merged Context PR;
 3. read `.pragma/design-contexts/issue-<n>/current.json` from that commit;
 4. resolve the immutable `versions/vN/manifest.json`;
-5. verify schema `2.0`, repo, Design Issue, linked Dev Issue, version, checksum, and required entrypoints;
+5. verify schema `2.0`, `pragma-integration/v2`, repo, Design Issue, linked Dev Issue, version, and required entrypoints, then independently recompute the canonical payload checksum;
 6. use the version directory directly for repo-native packages;
 7. use a trusted pre-dispatch materializer for MinIO objects;
 8. emit `pragma-context-descriptor/v1` and expose its entrypoints read-only;
 9. start or resume Codex app-server only after resolution succeeds.
 
-The descriptor pins at least the repo, Dev Issue, Design Issue, source commit, current pointer, manifest path, version, checksum, storage, resolved root, entrypoints, and read order. An in-flight turn never follows a later `current.json` update.
+The descriptor pins at least the repo, Dev Issue, Design Issue, source commit, current pointer, manifest path, version, package checksum, storage, resolved root, entrypoints, and read order. Its `checksum` field is the canonical package checksum. An in-flight turn never follows a later `current.json` update.
 
 ## MinIO Materialization
 
-MinIO objects are restored outside the Git worktree into a checksum-keyed cache. The materializer uses a read-only credential that is removed before app-server starts and is never inherited by the Agent shell or hooks.
+MinIO objects are restored outside the Git worktree into an artifact-checksum-keyed cache. The materializer uses the shared MVP credential only through its read path; the credential is removed before app-server starts and is never inherited by the Agent shell or hooks. It verifies exact archive bytes against `manifest.artifact.checksum`; the package checksum remains the payload identity.
 
 Materialization must reject:
 

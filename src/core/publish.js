@@ -1,11 +1,11 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { CliError } from "./errors.js";
-import { directorySizeBytes, pathExists, readJson, readText, writeJson } from "./fs.js";
-import { generateChecksums, sha256File } from "./checksum.js";
+import { directorySizeBytes, readJson, readText, writeJson } from "./fs.js";
+import { canonicalPackageChecksum, generateChecksums, sha256File } from "./checksum.js";
 import { packDesignContext } from "./pack.js";
 import { assertValidDesignContext } from "./validate.js";
-import { currentPathForIssueRoot, issueRootDir, manifestChecksum, normalizeVersion, resolveVersionContext, versionRelative, writeCurrentPointer } from "./versioning.js";
+import { currentPathForIssueRoot, issueRootDir, normalizeVersion, resolveVersionContext, versionRelative, writeCurrentPointer } from "./versioning.js";
 import { pragmaContextObjectKey, resolveMinioPublishConfig, uploadImmutableMinioObject } from "./minio.js";
 
 function mbToBytes(value) {
@@ -62,6 +62,7 @@ export async function publishDesignContext(options) {
     throw new CliError(`manifest.supersedes must be older than ${versionInfo.version}.`);
   }
   manifest.version = versionInfo.version;
+  manifest.integrationContractVersion = "pragma-integration/v2";
   manifest.versionNumber = versionInfo.versionNumber;
   manifest.supersedes = supersedes?.version || null;
   if (changeSummaryText) manifest.changeSummary = changeSummaryText;
@@ -74,16 +75,14 @@ export async function publishDesignContext(options) {
     reason: manifest.supersedes ? "new design context version" : "initial version",
     ...(manifest.compatibility || {})
   };
+  manifest.packageChecksum = await canonicalPackageChecksum(contextDir);
 
   if (sizeBytes > maxBytes) {
     throw new CliError(`Context is ${(sizeBytes / 1024 / 1024).toFixed(2)}MB, over the MVP max of ${maxMb}MB.`);
   }
 
   if (sizeBytes <= thresholdBytes) {
-    const checksum = options.zip && await pathExists(path.resolve(String(options.zip)))
-      ? await sha256File(path.resolve(String(options.zip)))
-      : (manifest.packageChecksum || await manifestChecksum(manifestPath));
-    manifest.packageChecksum = checksum;
+    const checksum = manifest.packageChecksum;
     manifest.artifact = {
       storage: "repo",
       owner: manifest.issue.repo?.split("/")?.[0],
@@ -123,11 +122,14 @@ export async function publishDesignContext(options) {
     fileName
   });
 
-  const zipPath = path.resolve(String(options.zip || path.join(contextDir, fileName)));
-  await packDesignContext({ context: contextDir, zip: zipPath });
+  const packed = await packDesignContext({
+    context: contextDir,
+    ...(options.zip ? { zip: path.resolve(String(options.zip)) } : {}),
+    excludeControlFiles: true,
+  });
+  const zipPath = packed.zipPath;
   const checksum = await sha256File(zipPath);
   const archiveSizeBytes = (await fs.stat(zipPath)).size;
-  manifest.packageChecksum = checksum;
 
   manifest.artifact = {
     storage: "minio-s3",
@@ -176,6 +178,7 @@ export async function publishDesignContext(options) {
     zipPath: pruneRepo ? undefined : zipPath,
     sizeBytes,
     checksum,
+    packageChecksum: manifest.packageChecksum,
     pruned: Boolean(pruneRepo),
     manifest,
     current,

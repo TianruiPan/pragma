@@ -12,7 +12,7 @@ import {
   writeJson,
   writeText
 } from "./fs.js";
-import { generateChecksums, sha256Text } from "./checksum.js";
+import { canonicalPackageChecksum, generateChecksums, sha256Text } from "./checksum.js";
 import { buildDependencies } from "./dependencies.js";
 import { parseFigmaUrl } from "./figma-url.js";
 import { extractSelectionFrames, extractSelectionNodes, listContextFiles, normalizeAssets, pruneUnreferencedAssetFiles, slugify } from "./normalize.js";
@@ -436,6 +436,7 @@ export async function ingestDesignContext(options) {
     .filter((issue) => Number.isInteger(issue) && issue > 0);
   const manifest = {
     schemaVersion: "2.0",
+    integrationContractVersion: "pragma-integration/v2",
     kind: "pragma-design-context-package",
     id: contextId,
     version: packageVersion,
@@ -488,13 +489,16 @@ export async function ingestDesignContext(options) {
     },
     artifact: {
       storage: "repo",
-      path: repoRelativeContextPath
+      path: repoRelativeContextPath,
+      checksum: sourceChecksum
     }
   };
   if (!manifest.entrypoints.lanhuUrl) delete manifest.entrypoints.lanhuUrl;
   if (!rawContextPresent) delete manifest.entrypoints.sourceDesignContext;
-  await writeJson(path.join(contextDir, "manifest.json"), manifest);
   await writeText(path.join(contextDir, "handoff", "README.md"), buildHandoffReadme({ capture, contextPath: repoRelativeContextPath }));
+  manifest.packageChecksum = await canonicalPackageChecksum(contextDir);
+  manifest.artifact.checksum = manifest.packageChecksum;
+  await writeJson(path.join(contextDir, "manifest.json"), manifest);
   await generateChecksums(contextDir);
 
   return {
