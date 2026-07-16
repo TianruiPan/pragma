@@ -5,15 +5,23 @@
   "type": "object",
   "required": [
     "schemaVersion",
+    "integrationContractVersion",
     "kind",
     "id",
+    "version",
+    "packageChecksum",
     "issue",
+    "linkedDevelopmentIssues",
     "source",
-    "entrypoints"
+    "entrypoints",
+    "artifact"
   ],
   "properties": {
     "schemaVersion": {
       "const": "2.0"
+    },
+    "integrationContractVersion": {
+      "const": "pragma-integration/v2"
     },
     "kind": {
       "const": "pragma-design-context-package"
@@ -22,12 +30,21 @@
       "type": "string",
       "minLength": 1
     },
+    "version": {
+      "type": "string",
+      "pattern": "^v[1-9][0-9]*$"
+    },
+    "packageChecksum": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-fA-F]{64}$"
+    },
     "issue": {
       "type": "object",
       "required": [
         "provider",
         "repo",
-        "number"
+        "number",
+        "type"
       ],
       "properties": {
         "provider": {
@@ -40,6 +57,9 @@
         "number": {
           "type": "integer",
           "minimum": 1
+        },
+        "type": {
+          "const": "design"
         },
         "title": {
           "type": "string"
@@ -65,6 +85,14 @@
         }
       },
       "additionalProperties": true
+    },
+    "linkedDevelopmentIssues": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "uniqueItems": true
     },
     "source": {
       "type": "object",
@@ -105,6 +133,7 @@
       "required": [
         "humanHandoff",
         "agentContext",
+        "agentWorkflow",
         "designContext",
         "pixelSpec",
         "layers",
@@ -125,6 +154,9 @@
           "type": "string"
         },
         "agentContext": {
+          "type": "string"
+        },
+        "agentWorkflow": {
           "type": "string"
         },
         "designContext": {
@@ -205,7 +237,7 @@
         },
         "checksum": {
           "type": "string",
-          "pattern": "^sha256:"
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
         },
         "publishedAt": {
           "type": "string"
@@ -215,6 +247,21 @@
         }
       },
       "allOf": [
+        {
+          "if": {
+            "properties": {
+              "storage": {
+                "const": "repo"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "path",
+              "checksum"
+            ]
+          }
+        },
         {
           "if": {
             "properties": {

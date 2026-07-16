@@ -3,7 +3,7 @@ import fs from "node:fs";
 const packageMetadata = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
 export const PRAGMA_SCHEMA_VERSION = "2.0";
-export const PRAGMA_INTEGRATION_CONTRACT_VERSION = "pragma-integration/v1";
+export const PRAGMA_INTEGRATION_CONTRACT_VERSION = "pragma-integration/v2";
 
 export function pragmaVersionPayload(env = process.env) {
   return {

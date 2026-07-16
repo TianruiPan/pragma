@@ -2,7 +2,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import { CliError } from "./errors.js";
 import { isPathInside, listFilesRecursive, pathExists, readJson, resolveRepoRootFromContext } from "./fs.js";
-import { sha256File } from "./checksum.js";
+import { canonicalPackageChecksum, sha256File } from "./checksum.js";
 import { isConcreteSnapshotId, isValidDependencyStatus } from "./dependencies.js";
 import { normalizeFigmaNodeId, parseFigmaUrl } from "./figma-url.js";
 import { mimeForType, sniffAssetFile, typeFromExtension } from "./mime.js";
@@ -757,6 +757,7 @@ export async function validateDesignContext(options) {
   }
 
   assert(manifest.schemaVersion === "2.0", "manifest.schemaVersion must be 2.0", errors);
+  assert(manifest.integrationContractVersion === "pragma-integration/v2", "manifest.integrationContractVersion must be pragma-integration/v2", errors);
   assert(manifest.kind === "pragma-design-context-package", "manifest.kind must be pragma-design-context-package", errors);
   assert(Boolean(manifest.id), "manifest.id is required", errors);
   assert(Boolean(manifest.version), "manifest.version is required", errors);
@@ -786,8 +787,9 @@ export async function validateDesignContext(options) {
   assert(Boolean(manifest.source?.provider), "manifest.source.provider is required", errors);
   assert(Boolean(manifest.source?.adapter), "manifest.source.adapter is required", errors);
   assert(Boolean(manifest.source?.capturedAt), "manifest.source.capturedAt is required", errors);
-  if (manifest.artifact?.checksum && manifest.packageChecksum) {
-    assert(manifest.artifact.checksum === manifest.packageChecksum, "manifest.artifact.checksum must match manifest.packageChecksum", errors);
+  if (manifest.artifact?.storage === "repo" && manifest.artifact?.checksum && manifest.packageChecksum) {
+    assert(manifest.artifact.checksum === manifest.packageChecksum, "repo artifact.checksum must match manifest.packageChecksum", errors);
+    assert(await canonicalPackageChecksum(contextDir) === manifest.packageChecksum, "manifest.packageChecksum does not match canonical package content", errors);
   }
 
   const entrypoints = manifest.entrypoints || {};
@@ -1124,7 +1126,7 @@ export async function validateDesignContext(options) {
     assert(Boolean(manifest.artifact.checksum), "manifest.artifact.checksum is required for minio-s3", errors);
     try {
       const expectedObjectKey = pragmaContextObjectKey({
-        objectPrefix: options["minio-object-prefix"] || options.minioObjectPrefix || process.env.PRAGMA_MINIO_OBJECT_PREFIX,
+        objectPrefix: options["minio-object-prefix"] || options.minioObjectPrefix || process.env.PRAGMA_CONTEXT_MINIO_OBJECT_PREFIX,
         repo: manifest.issue?.repo,
         designIssue: manifest.issue?.number,
         version: manifest.version,

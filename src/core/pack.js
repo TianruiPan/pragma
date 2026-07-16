@@ -22,12 +22,13 @@ function run(command, args, options = {}) {
   });
 }
 
-async function copyContextForZip(contextDir, stagingDir, zipPath) {
+async function copyContextForZip(contextDir, stagingDir, zipPath, excludeControlFiles = false) {
   await ensureDir(stagingDir);
   const files = await listFilesRecursive(contextDir);
   for (const file of files) {
     if (path.resolve(file) === path.resolve(zipPath)) continue;
     const rel = path.relative(contextDir, file);
+    if (excludeControlFiles && ["manifest.json", "checksums.json"].includes(rel.replaceAll("\\", "/"))) continue;
     const target = path.join(stagingDir, rel);
     await ensureDir(path.dirname(target));
     await fs.copyFile(file, target);
@@ -60,7 +61,7 @@ export async function packDesignContext(options) {
   await assertValidDesignContext({ context: contextDir });
   const stagingDir = await fs.mkdtemp(path.join(os.tmpdir(), "pragma-pack-"));
   try {
-    await copyContextForZip(contextDir, stagingDir, zipPath);
+    await copyContextForZip(contextDir, stagingDir, zipPath, options.excludeControlFiles !== false);
     await createZipFromStaging(stagingDir, zipPath);
   } finally {
     await fs.rm(stagingDir, { recursive: true, force: true });

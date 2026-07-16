@@ -4,19 +4,17 @@ import { CliError } from "./errors.js";
 const DEFAULT_OBJECT_PREFIX = "pragma-design-context";
 
 export function resolveMinioPublishConfig(options, { credentialsRequired = true } = {}) {
-  const endpoint = String(options["minio-endpoint"] || options.minioEndpoint || process.env.PRAGMA_MINIO_ENDPOINT || "").trim();
-  const bucket = String(options["minio-bucket"] || options.minioBucket || process.env.PRAGMA_MINIO_BUCKET || "").trim();
-  const region = String(options["minio-region"] || options.minioRegion || process.env.PRAGMA_MINIO_REGION || "us-east-1").trim();
-  const objectPrefix = normalizeObjectPrefix(options["minio-object-prefix"] || options.minioObjectPrefix || process.env.PRAGMA_MINIO_OBJECT_PREFIX || DEFAULT_OBJECT_PREFIX);
-  const accessKeyEnv = String(options["minio-access-key-env"] || options.minioAccessKeyEnv || "PRAGMA_MINIO_PUBLISH_ACCESS_KEY");
-  const secretKeyEnv = String(options["minio-secret-key-env"] || options.minioSecretKeyEnv || "PRAGMA_MINIO_PUBLISH_SECRET_KEY");
-  if (!endpoint) throw new CliError("PRAGMA_MINIO_ENDPOINT or --minio-endpoint is required when publishing packages over the threshold.");
-  if (!bucket) throw new CliError("PRAGMA_MINIO_BUCKET or --minio-bucket is required when publishing packages over the threshold.");
+  const endpoint = String(options["minio-endpoint"] || options.minioEndpoint || process.env.PRAGMA_CONTEXT_MINIO_ENDPOINT || "").trim();
+  const bucket = String(options["minio-bucket"] || options.minioBucket || process.env.PRAGMA_CONTEXT_MINIO_BUCKET || "").trim();
+  const region = String(options["minio-region"] || options.minioRegion || process.env.PRAGMA_CONTEXT_MINIO_REGION || "us-east-1").trim();
+  const objectPrefix = normalizeObjectPrefix(options["minio-object-prefix"] || options.minioObjectPrefix || process.env.PRAGMA_CONTEXT_MINIO_OBJECT_PREFIX || DEFAULT_OBJECT_PREFIX);
+  if (!endpoint) throw new CliError("PRAGMA_CONTEXT_MINIO_ENDPOINT or --minio-endpoint is required when publishing packages over the threshold.");
+  if (!bucket) throw new CliError("PRAGMA_CONTEXT_MINIO_BUCKET or --minio-bucket is required when publishing packages over the threshold.");
   const parsedEndpoint = parseMinioEndpoint(endpoint);
-  const accessKey = process.env[accessKeyEnv]?.trim();
-  const secretKey = process.env[secretKeyEnv]?.trim();
+  const accessKey = process.env.PRAGMA_CONTEXT_MINIO_ACCESS_KEY?.trim();
+  const secretKey = process.env.PRAGMA_CONTEXT_MINIO_SECRET_KEY?.trim();
   if (credentialsRequired && (!accessKey || !secretKey)) {
-    throw new CliError(`MinIO publisher credentials are required in ${accessKeyEnv} and ${secretKeyEnv}.`);
+    throw new CliError("MinIO publisher credentials are required in PRAGMA_CONTEXT_MINIO_ACCESS_KEY and PRAGMA_CONTEXT_MINIO_SECRET_KEY.");
   }
   return {
     endpoint,
